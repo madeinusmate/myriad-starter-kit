@@ -19,29 +19,47 @@ import type { MarketSummary, Pagination } from "@/lib/types";
 
 function MarketCardSkeleton() {
   return (
-    <Card className="h-full p-4">
-      <div className="flex items-start gap-3">
-        <Skeleton className="h-12 w-12 rounded-lg" />
-        <div className="flex-1 space-y-2">
+    <Card className="h-full flex flex-col overflow-hidden border border-border/50 py-0 gap-0">
+      {/* Cover Image Skeleton */}
+      <Skeleton className="h-40 w-full rounded-none" />
+
+      <div className="flex flex-1 flex-col px-4 pt-3 pb-2">
+        {/* Title Skeleton */}
+        <div className="mb-2 space-y-1.5">
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-4 w-3/4" />
         </div>
-      </div>
-      <div className="mt-4 space-y-2">
-        <Skeleton className="h-3 w-full" />
-        <Skeleton className="h-3 w-full" />
-      </div>
-      <div className="mt-4 flex justify-between border-t pt-3">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-3 w-16" />
+
+        {/* Outcome Section Skeleton */}
+        <div className="flex-1 space-y-2 mt-2">
+          {/* Mocking the probability bar headers */}
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-8" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+          {/* Mocking the probability bar */}
+          <Skeleton className="h-2.5 w-full rounded-full" />
+
+          {/* Mocking the buttons */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Skeleton className="h-9 rounded-xl" />
+            <Skeleton className="h-9 rounded-xl" />
+          </div>
+        </div>
+
+        {/* Footer Skeleton */}
+        <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-16" />
+        </div>
       </div>
     </Card>
   );
 }
 
-export function MarketListSkeleton({ count = 6 }: { count?: number }) {
+export function MarketListSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
         <MarketCardSkeleton key={i} />
       ))}
@@ -117,7 +135,7 @@ export function MarketList({
   return (
     <div className="space-y-6">
       {/* Market Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {markets.map((market) => (
           <MarketCard key={`${market.networkId}-${market.id}`} market={market} />
         ))}

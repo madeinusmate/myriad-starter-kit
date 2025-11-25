@@ -131,14 +131,18 @@ function MultiOutcome({ outcomes }: MultiOutcomeProps) {
     <div className="mt-3 space-y-2">
       {sortedOutcomes.map((outcome, idx) => (
         <div key={outcome.id} className="relative overflow-hidden rounded-lg bg-muted/30 p-2 hover:bg-muted/50 transition-colors">
-          <div className="flex items-center justify-between gap-3">
+          {/* Progress Bar Background */}
+          <div 
+            className="absolute inset-0 bg-primary/10"
+            style={{ width: `${outcome.price * 100}%` }} 
+          />
+          
+          <div className="relative flex items-center justify-between gap-3 z-10">
             <span className="text-sm font-medium truncate">{outcome.title}</span>
             <span className="text-sm font-bold tabular-nums text-primary">
               {formatPercent(outcome.price)}
             </span>
           </div>
-          {/* Simple bottom bar */}
-          <div className="absolute bottom-0 left-0 h-0.5 bg-primary/30" style={{ width: `${outcome.price * 100}%` }} />
         </div>
       ))}
     </div>
@@ -167,8 +171,8 @@ export function MarketCard({ market }: MarketCardProps) {
               src={market.imageUrl}
               alt={market.title}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-105 will-change-transform"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-muted to-muted/80">
@@ -179,9 +183,9 @@ export function MarketCard({ market }: MarketCardProps) {
           <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
 
-        <CardContent className="flex flex-1 flex-col px-4 py-3">
+        <CardContent className="flex flex-1 flex-col px-4 pt-3 pb-2 relative z-10 bg-card -mt-px">
           {/* Title */}
-          <h3 className="line-clamp-2 text-base font-bold leading-tight text-foreground mb-2 group-hover:text-primary transition-colors">
+          <h3 className="line-clamp-2 h-10 text-base font-bold leading-tight text-foreground mb-2 group-hover:text-primary transition-colors">
             {market.title}
           </h3>
 
@@ -195,15 +199,11 @@ export function MarketCard({ market }: MarketCardProps) {
           </div>
 
           {/* Footer Stats */}
-          <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-3 text-xs font-medium text-muted-foreground">
+          <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-xs font-medium text-muted-foreground">
             
             {/* Left: Avatars/Volume/Liquidity */}
             <div className="flex items-center gap-4">
-              {/* Placeholder avatars group (visual candy) */}
-              <div className="flex -space-x-2">
-                <div className="h-5 w-5 rounded-full bg-linear-to-br from-blue-400 to-purple-500 ring-2 ring-background" />
-                <div className="h-5 w-5 rounded-full bg-linear-to-br from-emerald-400 to-teal-500 ring-2 ring-background" />
-              </div>
+              {/* Placeholder avatars group (visual candy) - REMOVED */}
               <span className="text-foreground/80 tabular-nums">{formatCompact(market.volume24h)} Vol</span>
             </div>
 

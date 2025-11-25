@@ -83,9 +83,13 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
   const chartConfig = useMemo<ChartConfig>(() => {
     const config: ChartConfig = {};
     outcomes.forEach((outcome, index) => {
+      let color = `var(--chart-${(index % 10) + 1})`;
+      if (outcome.title.toLowerCase() === "yes") color = "#10b981"; // emerald-500
+      if (outcome.title.toLowerCase() === "no") color = "#f43f5e"; // rose-500
+
       config[`outcome_${outcome.id}`] = {
         label: outcome.title,
-        color: `var(--chart-${(index % 10) + 1})`,
+        color,
       };
     });
     return config;
@@ -238,35 +242,40 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
                 />
               }
             />
-            {outcomes.map((outcome, index) => (
-              <Line
-                key={outcome.id}
-                type="monotone"
-                dataKey={`outcome_${outcome.id}`}
-                name={outcome.title}
-                stroke={`var(--chart-${(index % 10) + 1})`}
-                strokeWidth={3}
-                strokeLinecap="round"
-                style={
-                  selectedOutcomeId === outcome.id
-                    ? { filter: "url(#glow)" }
-                    : undefined
-                }
-                dot={false}
-                activeDot={{
-                  r: 6,
-                  strokeWidth: 2,
-                  stroke: `var(--chart-${(index % 10) + 1})`,
-                  fill: "var(--background)",
-                }}
-                strokeOpacity={
-                  selectedOutcomeId === undefined || selectedOutcomeId === outcome.id
-                    ? 1
-                    : 0.3
-                }
-                connectNulls
-              />
-            ))}
+            {outcomes.map((outcome, index) => {
+              const color =
+                chartConfig[`outcome_${outcome.id}`]?.color ||
+                `var(--chart-${(index % 10) + 1})`;
+              return (
+                <Line
+                  key={outcome.id}
+                  type="monotone"
+                  dataKey={`outcome_${outcome.id}`}
+                  name={outcome.title}
+                  stroke={color}
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  style={
+                    selectedOutcomeId === outcome.id
+                      ? { filter: "url(#glow)" }
+                      : undefined
+                  }
+                  dot={false}
+                  activeDot={{
+                    r: 6,
+                    strokeWidth: 2,
+                    stroke: color,
+                    fill: "var(--background)",
+                  }}
+                  strokeOpacity={
+                    selectedOutcomeId === undefined || selectedOutcomeId === outcome.id
+                      ? 1
+                      : 0.3
+                  }
+                  connectNulls
+                />
+              );
+            })}
           </LineChart>
         </ChartContainer>
       ) : (
@@ -278,26 +287,31 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
       {/* Legend */}
       {showLegend && (
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          {outcomes.map((outcome, index) => (
-            <div
-              key={outcome.id}
-              className={cn(
-                "flex items-center gap-2",
-                selectedOutcomeId === outcome.id && "font-medium"
-              )}
-            >
+          {outcomes.map((outcome, index) => {
+            const color =
+              chartConfig[`outcome_${outcome.id}`]?.color ||
+              `var(--chart-${(index % 10) + 1})`;
+            return (
               <div
-                className="h-2.5 w-2.5 rounded-full"
-                style={{
-                  backgroundColor: `var(--chart-${(index % 10) + 1})`,
-                }}
-              />
-              <span className="truncate max-w-[150px]">{outcome.title}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {(outcome.price * 100).toFixed(1)}%
-              </span>
-            </div>
-          ))}
+                key={outcome.id}
+                className={cn(
+                  "flex items-center gap-2",
+                  selectedOutcomeId === outcome.id && "font-medium"
+                )}
+              >
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    backgroundColor: color,
+                  }}
+                />
+                <span className="truncate max-w-[150px]">{outcome.title}</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {(outcome.price * 100).toFixed(1)}%
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
