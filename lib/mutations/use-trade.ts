@@ -12,8 +12,9 @@ import { useAccount, useSendCalls, useCallsStatus } from "wagmi";
 import { useCallback, useState, useEffect } from "react";
 import { encodeFunctionData, parseUnits, type Hex } from "viem";
 import { useAbstractClient } from "@abstract-foundation/agw-react";
+import { toast } from "sonner";
 import { useNetwork } from "@/lib/network-context";
-import { TOKENS, REFERRAL_CODE } from "@/lib/config";
+import { TOKENS, REFERRAL_CODE, NETWORK } from "@/lib/config";
 import { marketKeys } from "@/lib/queries";
 import { portfolioKeys } from "@/lib/queries/portfolio";
 import type { TradeAction, TransactionStatus } from "@/lib/types";
@@ -104,20 +105,27 @@ export function useTrade() {
   const { data: abstractClient } = useAbstractClient();
   const { contracts, apiBaseUrl } = useNetwork();
   const queryClient = useQueryClient();
-  const { sendCalls, data: bundleId, isPending: isSending, error: sendError } = useSendCalls();
+  const { sendCallsAsync, isPending: isSending, error: sendError } = useSendCalls();
   
-  // Extract the bundle ID string from the sendCalls result
-  const bundleIdString = typeof bundleId === "object" && bundleId !== null 
-    ? bundleId.id 
-    : bundleId;
+  // Track the bundle ID from the async call
+  const [bundleId, setBundleId] = useState<string | null>(null);
   
-  // Track bundle status
-  const { data: callsStatus } = useCallsStatus({
-    id: bundleIdString as string,
+  // Track bundle status with polling until confirmed or failed
+  const { data: callsStatus, isFetching: isPolling } = useCallsStatus({
+    id: bundleId as string,
     query: {
-      enabled: !!bundleIdString,
-      refetchInterval: (data) => 
-        data.state.data?.status === "pending" ? 1000 : false,
+      enabled: !!bundleId,
+      // Always fetch fresh data when polling
+      staleTime: 0,
+      // Poll every second while pending, stop when confirmed/failed
+      // Status values: "pending" | "success" | "failure"
+      refetchInterval: (query) => {
+        const txStatus = query.state.data?.status;
+        // Stop polling once we have a final state
+        if (txStatus === "success") return false;
+        if (txStatus === "failure") return false;
+        return 1000; // Keep polling every second
+      },
     },
   });
 
@@ -125,10 +133,38 @@ export function useTrade() {
   const [status, setStatus] = useState<TransactionStatus>("idle");
   const [currentAction, setCurrentAction] = useState<TradeAction | null>(null);
 
-  // Update status based on calls status
+  // Update status based on calls status - handle success AND failure
+  // GetCallsStatusReturnType.status values: "pending" | "success" | "failure"
   useEffect(() => {
-    if (callsStatus?.status === "success") {
+    if (!callsStatus) return;
+    
+    const txStatus = callsStatus.status;
+    
+    // Handle success (all calls in batch succeeded)
+    if (txStatus === "success") {
       setStatus("confirmed");
+      
+      // Log receipts for debugging
+      console.log("Transaction confirmed! Receipts:", callsStatus.receipts);
+      
+      // Get the transaction hash from receipts (usually the last receipt is the main tx)
+      const txHash = callsStatus.receipts?.[callsStatus.receipts.length - 1]?.transactionHash;
+      const explorerUrl = txHash 
+        ? `${NETWORK.blockExplorer}/tx/${txHash}` 
+        : undefined;
+      
+      // Show success toast with link to explorer
+      toast.success(
+        currentAction === "buy" ? "Purchase confirmed!" : "Sale confirmed!",
+        {
+          description: "Transaction confirmed on-chain",
+          action: explorerUrl ? {
+            label: "View",
+            onClick: () => window.open(explorerUrl, "_blank"),
+          } : undefined,
+          duration: 5000,
+        }
+      );
       
       // Invalidate caches on success
       queryClient.invalidateQueries({ queryKey: marketKeys.all });
@@ -142,9 +178,29 @@ export function useTrade() {
       setTimeout(() => {
         setStatus("idle");
         setCurrentAction(null);
+        setBundleId(null); // Clear bundle ID
       }, 3000);
     }
-  }, [callsStatus?.status, queryClient, address, apiBaseUrl]);
+    
+    // Handle failure (transaction failed on-chain)
+    if (txStatus === "failure") {
+      console.error("Transaction bundle failed:", callsStatus);
+      setStatus("failed");
+      
+      // Show error toast
+      toast.error("Transaction failed", {
+        description: "The transaction was reverted on-chain. Please try again.",
+        duration: 5000,
+      });
+      
+      // Reset after delay
+      setTimeout(() => {
+        setStatus("idle");
+        setCurrentAction(null);
+        setBundleId(null); // Clear bundle ID
+      }, 3000);
+    }
+  }, [callsStatus, queryClient, address, apiBaseUrl]);
 
   const mutation = useMutation({
     mutationFn: async (params: TradeParams): Promise<TradeResult> => {
@@ -244,24 +300,33 @@ export function useTrade() {
       setStatus("pending_signature");
 
       // Send batched calls - single wallet popup!
-      // sendCalls is async but returns void - the bundleId comes from the hook state
-      await sendCalls({
+      const result = await sendCallsAsync({
         calls,
       });
 
+      console.log("Result:", result);
+
+      // Extract the bundle ID from the result
+      const resultBundleId = typeof result === "object" && result !== null 
+        ? result.id 
+        : result;
+      
+      setBundleId(resultBundleId);
       setStatus("confirming");
 
       return {
-        hash: bundleIdString || "pending",
+        hash: resultBundleId || "pending",
         action: params.action,
       };
     },
 
-    onError: () => {
+    onError: (error) => {
+      console.error("Trade mutation error:", error);
       setStatus("failed");
       setTimeout(() => {
         setStatus("idle");
         setCurrentAction(null);
+        setBundleId(null);
       }, 3000);
     },
   });
@@ -271,16 +336,30 @@ export function useTrade() {
     [mutation]
   );
 
+  // Helper to check if bundle is confirmed
+  // GetCallsStatusReturnType.status: "pending" | "success" | "failure"
+  const isConfirmed = callsStatus?.status === "success";
+  const isFailed = callsStatus?.status === "failure";
+
+  // Reset function that clears all state
+  const reset = useCallback(() => {
+    mutation.reset();
+    setBundleId(null);
+    setStatus("idle");
+    setCurrentAction(null);
+  }, [mutation]);
+
   return {
     trade,
     status,
     isPending: mutation.isPending || isSending,
-    isSuccess: callsStatus?.status === "success",
-    isError: mutation.isError || !!sendError,
+    isConfirming: (isPolling || callsStatus?.status === "pending") && !!bundleId && !isConfirmed && !isFailed,
+    isSuccess: isConfirmed,
+    isError: mutation.isError || !!sendError || isFailed,
     error: mutation.error || sendError,
     data: mutation.data,
-    reset: mutation.reset,
-    bundleId: bundleIdString,
+    reset,
+    bundleId,
     callsStatus,
   };
 }
