@@ -4,9 +4,7 @@
  * App Providers
  *
  * This file wraps the application with all necessary providers:
- * - WagmiProvider: Wallet connection and blockchain interactions
- * - QueryClientProvider: TanStack Query for data fetching
- * - RainbowKitProvider: Wallet connection UI
+ * - NextAbstractWalletProvider: Wraps Wagmi, QueryClient, and AbstractWalletProvider for wallet connection and blockchain interactions
  * - NetworkProvider: Network configuration
  *
  * The provider order matters - outer providers are available to inner ones.

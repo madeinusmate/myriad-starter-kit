@@ -164,25 +164,40 @@ export function MarketCard({ market }: MarketCardProps) {
       <Card className="group h-full flex flex-col overflow-hidden border border-border/50 bg-card py-0 gap-0 transition-all hover:border-primary/50 hover:shadow-lg dark:hover:shadow-primary/5 hover:-translate-y-1 duration-300">
         
         {/* Cover Image Area */}
-        <div className="relative h-40 w-full overflow-hidden bg-muted/50">
-          {market.imageUrl ? (
-            <Image
-              src={market.imageUrl}
-              alt={market.title}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105 will-change-transform"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-muted to-muted/80">
-              <BarChart3 className="h-8 w-8 text-muted-foreground/30" />
+        <div className="relative h-40 w-full z-0">
+          {/* Ambient Glow Effect */}
+          {market.imageUrl && (
+            <div className="absolute inset-0 -z-10 overflow-visible">
+              <Image
+                src={market.imageUrl}
+                alt=""
+                fill
+                className="object-cover blur-2xl scale-125 opacity-60 saturate-200"
+                aria-hidden="true"
+              />
             </div>
           )}
-          {/* Overlay gradient for better text contrast if we put text over it (optional, currently text is below) */}
-          <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+          <div className="relative h-full w-full overflow-hidden bg-muted/50 rounded-t-xl">
+            {market.imageUrl ? (
+              <Image
+                src={market.imageUrl}
+                alt={market.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-105 will-change-transform"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-muted to-muted/80">
+                <BarChart3 className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            )}
+            {/* Overlay gradient for better text contrast if we put text over it (optional, currently text is below) */}
+            <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </div>
         </div>
 
-        <CardContent className="flex flex-1 flex-col px-4 pt-3 pb-2 relative z-10 bg-card -mt-px">
+        <CardContent className="flex flex-1 flex-col px-4 pt-3 pb-2 relative z-10 -mt-px">
           {/* Title */}
           <div className="h-10 mb-2 flex items-center">
             <h3 className="line-clamp-2 text-base font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
