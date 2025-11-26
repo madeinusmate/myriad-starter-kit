@@ -12,8 +12,10 @@
  * - Execute trade button
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useAccount, useReadContract } from "wagmi";
+import { erc20Abi, formatUnits } from "viem";
+import { useQuery } from "@tanstack/react-query";
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useNetwork } from "@/lib/network-context";
 import { getQuote } from "@/lib/myriad-api";
 import { useTrade } from "@/lib/mutations";
+import { portfolioQueryOptions } from "@/lib/queries/portfolio";
 import { cn } from "@/lib/utils";
+import { TOKENS } from "@/lib/config";
 import type { Market, TradeAction, Quote } from "@/lib/types";
 
 // =============================================================================
@@ -56,10 +60,56 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
   const selectedOutcome = market.outcomes.find((o) => o.id === selectedOutcomeId);
   const sortedOutcomes = [...market.outcomes].sort((a, b) => b.price - a.price);
 
+  // Fetch USDC balance for buy tab
+  const { data: usdcBalanceRaw } = useReadContract({
+    address: TOKENS.USDC.address,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && action === "buy",
+      refetchInterval: 10000,
+    },
+  });
+
+  const usdcBalance = useMemo(() => {
+    if (!usdcBalanceRaw) return 0;
+    return parseFloat(formatUnits(usdcBalanceRaw, TOKENS.USDC.decimals));
+  }, [usdcBalanceRaw]);
+
+  // Fetch user's positions to get shares for sell tab
+  const { data: portfolioData } = useQuery({
+    ...portfolioQueryOptions(apiBaseUrl, address ?? "", {
+      networkId: networkConfig.id,
+      marketId: market.id,
+    }),
+    enabled: !!address && action === "sell",
+  });
+
+  // Get shares for the selected outcome
+  const sharesBalance = useMemo(() => {
+    if (!portfolioData?.data) return 0;
+    const position = portfolioData.data.find(
+      (p) => p.outcomeId === selectedOutcomeId
+    );
+    return position?.shares ?? 0;
+  }, [portfolioData, selectedOutcomeId]);
+
+  // Available balance based on action
+  const availableBalance = action === "buy" ? usdcBalance : sharesBalance;
+
+  // Handle percentage button clicks
+  const handlePercentageClick = (percent: number) => {
+    const value = availableBalance * (percent / 100);
+    if (value > 0) {
+      setAmount(value.toFixed(2));
+    }
+  };
+
   // Fetch quote when amount changes
   const fetchQuote = useCallback(async () => {
-    const value = parseFloat(amount);
-    if (!value || value <= 0) {
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
       setQuote(null);
       return;
     }
@@ -68,12 +118,18 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
     setQuoteError(null);
 
     try {
+      // For buy: amount is USDC value to spend
+      // For sell: amount is number of shares to sell
+      const quoteParams = action === "buy" 
+        ? { value: parsedAmount }
+        : { shares: parsedAmount };
+
       const newQuote = await getQuote(apiBaseUrl, {
         marketId: market.id,
         networkId: networkConfig.id,
         outcomeId: selectedOutcomeId,
         action,
-        value,
+        ...quoteParams,
         slippage: 0.01, // 1% slippage
       });
       setQuote(newQuote);
@@ -96,11 +152,13 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
     if (!quote || !amount) return;
 
     try {
+      // For buy: value is USDC amount to spend
+      // For sell: value is USDC amount to receive (from quote)
       await trade({
         action,
         marketId: market.id,
         outcomeId: selectedOutcomeId,
-        value: parseFloat(amount),
+        value: quote.value,
         sharesThreshold: quote.sharesThreshold,
         tokenAddress: market.tokenAddress,
         tokenDecimals: 6, // USDC uses 6 decimals
@@ -118,14 +176,22 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
   const isMarketOpen = market.state === "open";
 
   // Calculate max profit for display
+  // For buy: max profit = potential payout (shares) - cost - fees
+  // For sell: profit = USDC received (quote.value) - fees
   const maxProfit = quote
     ? action === "buy"
-      ? quote.shares - parseFloat(amount) - quote.fees.fee
-      : parseFloat(amount) - quote.fees.fee
+      ? quote.shares - quote.value - quote.fees.fee
+      : quote.value - quote.fees.fee
     : 0;
   
-  const maxProfitPercent = quote && parseFloat(amount) > 0
-    ? (maxProfit / parseFloat(amount)) * 100
+  // For buy: percent return on investment
+  // For sell: percent of position value realized
+  const maxProfitPercent = quote
+    ? action === "buy" && quote.value > 0
+      ? (maxProfit / quote.value) * 100
+      : action === "sell" && parseFloat(amount) > 0
+        ? ((quote.value - quote.fees.fee) / parseFloat(amount) - 1) * 100
+        : 0
     : 0;
 
   return (
@@ -207,22 +273,64 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
               })}
             </div>
           </div>
+        </div>
 
+        <div className="h-px bg-border" />
+
+        <div className="p-4 space-y-4">
           {/* Amount Input */}
           <div>
-            <label className="text-sm text-muted-foreground block mb-2">
-              Amount
-            </label>
-            <Input
-              type="number"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={!isMarketOpen}
-              min="0"
-              step="0.01"
-              className="bg-background"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-muted-foreground">
+                Amount
+              </label>
+              {isConnected && (
+                <span className="text-sm text-muted-foreground">
+                  Available{" "}
+                  <span className="text-foreground font-medium">
+                    {action === "buy" 
+                      ? `$${availableBalance.toFixed(2)}`
+                      : `${availableBalance.toFixed(2)} shares`
+                    }
+                  </span>
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {action === "buy" ? "$" : ""}
+                </span>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={!isMarketOpen}
+                  min="0"
+                  step="0.01"
+                  className={cn(
+                    "bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                    action === "buy" && "pl-7"
+                  )}
+                />
+              </div>
+              <div className="flex gap-1">
+                {[25, 50, 100].map((percent) => (
+                  <Button
+                    key={percent}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="px-2 h-9 text-xs"
+                    onClick={() => handlePercentageClick(percent)}
+                    disabled={!isMarketOpen || !isConnected || availableBalance <= 0}
+                  >
+                    {percent}%
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Action Button */}
@@ -270,18 +378,18 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
               ) : (
                 <span className="text-foreground tabular-nums">
                   {quote
-                    ? `${(quote.priceBefore * 100).toFixed(2)} pts → ${(quote.priceAfter * 100).toFixed(2)} pts`
-                    : "0.00 pts → 0.00 pts"}
+                    ? `${(quote.priceBefore * 100).toFixed(1)}¢ → ${(quote.priceAfter * 100).toFixed(1)}¢`
+                    : "—"}
                 </span>
               )}
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>Shares</span>
+              <span>{action === "buy" ? "Shares" : "Shares to sell"}</span>
               {isLoadingQuote ? (
                 <Skeleton className="h-4 w-12" />
               ) : (
                 <span className="text-foreground tabular-nums">
-                  {quote?.shares.toFixed(2) ?? "0"}
+                  {quote?.shares.toFixed(2) ?? "—"}
                 </span>
               )}
             </div>
@@ -291,12 +399,12 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
                 <Skeleton className="h-4 w-16" />
               ) : (
                 <span className="text-foreground tabular-nums">
-                  {quote ? `${(quote.priceAverage * 100).toFixed(2)} pts` : "0.00 pts"}
+                  {quote ? `$${quote.priceAverage.toFixed(3)}/share` : "—"}
                 </span>
               )}
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>Max profit</span>
+              <span>{action === "buy" ? "Max profit" : "Est. return"}</span>
               {isLoadingQuote ? (
                 <Skeleton className="h-4 w-24" />
               ) : (
@@ -304,17 +412,25 @@ export function TradePanel({ market, selectedOutcomeId, onOutcomeChange }: Trade
                   "tabular-nums",
                   maxProfit > 0 ? "text-emerald-500" : maxProfit < 0 ? "text-rose-500" : "text-foreground"
                 )}>
-                  {maxProfit > 0 ? "+" : ""}{maxProfit.toFixed(2)} pts ({maxProfitPercent > 0 ? "+" : ""}{maxProfitPercent.toFixed(0)}%)
+                  {quote
+                    ? action === "buy"
+                      ? `${maxProfit >= 0 ? "+$" : "-$"}${Math.abs(maxProfit).toFixed(2)} (${maxProfitPercent >= 0 ? "+" : ""}${maxProfitPercent.toFixed(0)}%)`
+                      : `$${(quote.value - quote.fees.fee).toFixed(2)}`
+                    : "—"}
                 </span>
               )}
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>Max payout</span>
+              <span>{action === "buy" ? "Max payout" : "Fees"}</span>
               {isLoadingQuote ? (
                 <Skeleton className="h-4 w-16" />
               ) : (
                 <span className="text-foreground tabular-nums">
-                  {quote?.shares.toFixed(2) ?? "0.00"} pts
+                  {quote 
+                    ? action === "buy" 
+                      ? `$${quote.shares.toFixed(2)}`
+                      : `$${quote.fees.fee.toFixed(2)}`
+                    : "—"}
                 </span>
               )}
             </div>
