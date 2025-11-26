@@ -8,9 +8,12 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAccount, useConnectorClient } from "wagmi";
+import { useAccount } from "wagmi";
 import { useCallback, useState } from "react";
+import { transformEIP1193Provider } from "@abstract-foundation/agw-client";
+import type { EIP1193Provider } from "viem";
 import { useNetwork } from "@/lib/network-context";
+import { chain } from "@/config/chain";
 import { initializeSdk, claimWinnings, claimVoided } from "@/lib/myriad-sdk";
 import { marketKeys, portfolioKeys } from "@/lib/queries";
 import type { ClaimAction, TransactionStatus } from "@/lib/types";
@@ -64,8 +67,7 @@ interface ClaimResult {
  * ```
  */
 export function useClaim() {
-  const { address } = useAccount();
-  const { data: connectorClient } = useConnectorClient();
+  const { address, connector } = useAccount();
   const { apiBaseUrl } = useNetwork();
   const queryClient = useQueryClient();
 
@@ -74,9 +76,19 @@ export function useClaim() {
   const mutation = useMutation({
     mutationFn: async (params: ClaimParams): Promise<ClaimResult> => {
       if (!address) throw new Error("Wallet not connected");
-      if (!connectorClient) throw new Error("No wallet client available");
+      if (!connector) throw new Error("No wallet connector available");
 
-      const provider = await connectorClient.transport;
+      // Get the raw EIP-1193 provider from the connector
+      const rawProvider = await connector.getProvider();
+
+      // Transform the provider to be AGW-compatible
+      // isPrivyCrossApp ensures the smart account address is used for gas estimation
+      const provider = transformEIP1193Provider({
+        provider: rawProvider as EIP1193Provider,
+        chain: chain,
+        isPrivyCrossApp: true,
+      });
+
       const sdk = await initializeSdk(provider);
 
       setStatus("pending_signature");

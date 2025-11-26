@@ -12,10 +12,13 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAccount, useConnectorClient } from "wagmi";
+import { useAccount } from "wagmi";
 import { useCallback, useState } from "react";
+import { transformEIP1193Provider } from "@abstract-foundation/agw-client";
+import type { EIP1193Provider } from "viem";
 import { useNetwork } from "@/lib/network-context";
-import { REFERRAL_CODE } from "@/lib/config";
+import { REFERRAL_CODE, TOKENS } from "@/lib/config";
+import { chain } from "@/config/chain";
 import {
   initializeSdk,
   getErc20Contract,
@@ -93,8 +96,7 @@ interface TradeResult {
  * ```
  */
 export function useTrade() {
-  const { address } = useAccount();
-  const { data: connectorClient } = useConnectorClient();
+  const { address, connector } = useAccount();
   const { contracts, apiBaseUrl } = useNetwork();
   const queryClient = useQueryClient();
 
@@ -104,36 +106,64 @@ export function useTrade() {
   const mutation = useMutation({
     mutationFn: async (params: TradeParams): Promise<TradeResult> => {
       if (!address) throw new Error("Wallet not connected");
-      if (!connectorClient) throw new Error("No wallet client available");
+      if (!connector) throw new Error("No wallet connector available");
 
-      // Get provider from connector
-      const provider = await connectorClient.transport;
+      // Get the raw EIP-1193 provider from the connector
+      const rawProvider = await connector.getProvider();
 
-      // Initialize SDK
+      // Transform the provider to be AGW-compatible
+      // This is required for Abstract Global Wallet to properly handle transactions
+      // isPrivyCrossApp ensures the smart account address is used for gas estimation
+      const provider = transformEIP1193Provider({
+        provider: rawProvider as EIP1193Provider,
+        chain: chain,
+        isPrivyCrossApp: true,
+      });
+
+      // Initialize SDK with the transformed AGW provider
       const sdk = await initializeSdk(provider);
 
+      // Use the provided token address, or fall back to USDC as default
+      const tokenAddress = params.tokenAddress || TOKENS.USDC.address;
+      
+      if (!tokenAddress) {
+        throw new Error("No token address available for this market");
+      }
+
       // Get ERC20 contract for approval checks
-      const erc20 = getErc20Contract(sdk.app, params.tokenAddress);
+      const erc20 = await getErc20Contract(sdk.app, tokenAddress);
 
-      // Check if we need approval (for buys only)
+      // For buys, we need to ensure token approval
       if (params.action === "buy") {
-        setStatus("pending_approval");
-
-        const isApproved = await checkApproval(
-          erc20,
-          address,
-          String(params.value * 1e6), // Assume 6 decimals for USDC
-          contracts.predictionMarket
-        );
-
-        if (!isApproved) {
-          setStatus("approving");
-          // Approve max amount for convenience
-          await approveToken(
+        setStatus("approving");
+        
+        // Always attempt approval - this ensures we have sufficient allowance
+        // The approval transaction will prompt the user's wallet
+        // Use a large but safe approval amount (1 trillion tokens with 6 decimals = 1e18)
+        // This avoids ABI encoding issues with max uint256
+        const maxApproval = "1000000000000000000";
+        
+        console.log("Requesting token approval for address:", address);
+        console.log("Token address:", tokenAddress);
+        console.log("Spender (prediction market):", contracts.predictionMarket);
+        
+        try {
+          const approvalResult = await approveToken(
             erc20,
-            String(Number.MAX_SAFE_INTEGER),
+            maxApproval,
             contracts.predictionMarket
           );
+          
+          console.log("Approval transaction result:", approvalResult);
+          
+          // Wait for the approval transaction to be confirmed
+          // This is important - we need the approval to be on-chain before trading
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          console.log("Approval confirmed, proceeding with trade...");
+        } catch (e) {
+          console.error("Approval failed:", e);
+          throw new Error(`Token approval failed: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
 
