@@ -129,7 +129,7 @@ export default function MarketDetailPage() {
           {/* Market Header - Compact */}
           <div className="flex items-start gap-4">
             {market.imageUrl && (
-              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
                 <Image
                   src={market.imageUrl}
                   alt={market.title}
@@ -257,7 +257,7 @@ export default function MarketDetailPage() {
                   
                   {/* Market published */}
                   <div className="flex gap-3 items-start relative">
-                    <CheckCircle className="h-6 w-6 text-emerald-500 bg-card flex-shrink-0" />
+                    <CheckCircle className="h-6 w-6 text-emerald-500 bg-card shrink-0" />
                     <div>
                       <p className="font-medium text-sm">Market published</p>
                       <p className="text-xs text-muted-foreground">
@@ -269,9 +269,9 @@ export default function MarketDetailPage() {
                   {/* Market closes */}
                   <div className="flex gap-3 items-start relative">
                     {market.state !== "open" ? (
-                      <CheckCircle className="h-6 w-6 text-emerald-500 bg-card flex-shrink-0" />
+                      <CheckCircle className="h-6 w-6 text-emerald-500 bg-card shrink-0" />
                     ) : (
-                      <Circle className="h-6 w-6 text-muted-foreground bg-card flex-shrink-0" />
+                      <Circle className="h-6 w-6 text-muted-foreground bg-card shrink-0" />
                     )}
                     <div>
                       <p className="font-medium text-sm">Market closes</p>
@@ -284,9 +284,9 @@ export default function MarketDetailPage() {
                   {/* Resolution */}
                   <div className="flex gap-3 items-start relative">
                     {market.state === "resolved" ? (
-                      <CheckCircle className="h-6 w-6 text-emerald-500 bg-card flex-shrink-0" />
+                      <CheckCircle className="h-6 w-6 text-emerald-500 bg-card shrink-0" />
                     ) : (
-                      <Circle className="h-6 w-6 text-muted-foreground bg-card flex-shrink-0" />
+                      <Circle className="h-6 w-6 text-muted-foreground bg-card shrink-0" />
                     )}
                     <div>
                       <p className="font-medium text-sm">Resolution</p>

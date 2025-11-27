@@ -75,12 +75,6 @@ function BinaryOutcome({ outcomes }: BinaryOutcomeProps) {
 
   const [outcomeLeft, outcomeRight] = orderedOutcomes;
   
-  // Colors for the bar
-  // Left: usually green/teal/blue
-  // Right: usually red/pink/orange
-  const leftColor = "bg-[#10b981]"; // emerald-500
-  const rightColor = "bg-[#ec4899]"; // pink-500 (or rose)
-
   return (
     <div className="mt-4 space-y-3">
       {/* Probability Bar */}
@@ -128,7 +122,7 @@ function MultiOutcome({ outcomes }: MultiOutcomeProps) {
 
   return (
     <div className="mt-3 space-y-2">
-      {sortedOutcomes.map((outcome, idx) => (
+      {sortedOutcomes.map((outcome) => (
         <div key={outcome.id} className="relative overflow-hidden rounded-lg bg-muted/30 p-2 hover:bg-muted/50 transition-colors">
           {/* Progress Bar Background */}
           <div 
@@ -192,7 +186,7 @@ export function MarketCard({ market }: MarketCardProps) {
                 <BarChart3 className="h-8 w-8 text-muted-foreground/30" />
               </div>
             )}
-            {/* Overlay gradient for better text contrast if we put text over it (optional, currently text is below) */}
+            {/* Hover gradient overlay */}
             <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </div>
         </div>
@@ -216,10 +210,8 @@ export function MarketCard({ market }: MarketCardProps) {
 
           {/* Footer Stats */}
           <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-xs font-medium text-muted-foreground">
-            
-            {/* Left: Avatars/Volume/Liquidity */}
+            {/* Volume */}
             <div className="flex items-center gap-4">
-              {/* Placeholder avatars group (visual candy) - REMOVED */}
               <span className="text-foreground/80 tabular-nums">{formatCompact(market.volume24h)} Vol</span>
             </div>
 

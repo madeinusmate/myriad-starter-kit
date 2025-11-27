@@ -170,12 +170,3 @@
 .prose li > ol {
   margin-left: 1.5rem;
 }
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}

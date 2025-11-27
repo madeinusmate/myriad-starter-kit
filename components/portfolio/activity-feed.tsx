@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Loader2, ShoppingCart, Banknote, RefreshCw, ExternalLink, BarChart3 } from "lucide-react";
+import { Loader2, ShoppingCart, Banknote, RefreshCw, BarChart3 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";

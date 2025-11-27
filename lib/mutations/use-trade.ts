@@ -80,8 +80,6 @@ export interface TradeParams {
   tokenAddress: string;
   /** Token decimals (default 6 for USDC) */
   tokenDecimals?: number;
-  /** Pre-encoded calldata from the quote API (deprecated - we encode locally now) */
-  calldata?: string;
 }
 
 interface TradeResult {
@@ -131,7 +129,6 @@ export function useTrade() {
     
     if (txStatus === "success") {
       setStatus("confirmed");
-      console.log("Transaction confirmed! Receipts:", callsStatus.receipts);
       
       const txHash = callsStatus.receipts?.[callsStatus.receipts.length - 1]?.transactionHash;
       const explorerUrl = txHash 
@@ -203,18 +200,6 @@ export function useTrade() {
       const valueInDecimals = parseUnits(params.value.toString(), tokenDecimals);
       const sharesThresholdInDecimals = parseUnits(params.sharesThreshold.toString(), tokenDecimals);
       
-      console.log("Trade params:", {
-        action: params.action,
-        marketId: params.marketId,
-        outcomeId: params.outcomeId,
-        value: params.value,
-        valueInDecimals: valueInDecimals.toString(),
-        sharesThreshold: params.sharesThreshold,
-        sharesThresholdInDecimals: sharesThresholdInDecimals.toString(),
-        tokenDecimals,
-        referralCode: REFERRAL_CODE,
-      });
-
       if (params.action === "buy") {
         setStatus("approving");
         
@@ -266,14 +251,11 @@ export function useTrade() {
         });
       }
 
-      console.log("Sending batched calls:", calls);
       setStatus("pending_signature");
 
       const result = await sendCallsAsync({
         calls,
       });
-
-      console.log("Result:", result);
 
       const resultBundleId = typeof result === "object" && result !== null 
         ? result.id 

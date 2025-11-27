@@ -20,7 +20,6 @@ import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNetwork } from "@/lib/network-context";
 import { getQuote } from "@/lib/myriad-api";
