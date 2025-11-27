@@ -4,12 +4,13 @@
  * Market List Component
  *
  * Displays a grid of market cards with loading and empty states.
- * Handles pagination through "Load More" button.
+ * Handles pagination through infinite scroll.
  */
 
 import { MarketCard } from "./market-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Loader2 } from "lucide-react";
 import type { MarketSummary, Pagination } from "@/lib/types";
 
@@ -68,42 +69,6 @@ export function MarketListSkeleton({ count = 8 }: { count?: number }) {
 }
 
 // =============================================================================
-// Empty State
-// =============================================================================
-
-interface EmptyStateProps {
-  title?: string;
-  description?: string;
-}
-
-function EmptyState({
-  title = "No markets found",
-  description = "Try adjusting your filters or check back later.",
-}: EmptyStateProps) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="rounded-full bg-muted p-4">
-        <svg
-          className="h-8 w-8 text-muted-foreground"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      </div>
-      <h3 className="mt-4 text-lg font-medium">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-// =============================================================================
 // Market List Component
 // =============================================================================
 
@@ -120,7 +85,6 @@ export function MarketList({
   markets,
   pagination,
   isLoading,
-  onLoadMore,
   isLoadingMore,
   loadMoreRef,
 }: MarketListProps) {
@@ -129,7 +93,12 @@ export function MarketList({
   }
 
   if (markets.length === 0) {
-    return <EmptyState />;
+    return (
+      <EmptyState
+        title="No markets found"
+        description="Try adjusting your filters or check back later."
+      />
+    );
   }
 
   return (
@@ -143,7 +112,10 @@ export function MarketList({
 
       {/* Load More */}
       {pagination && pagination.hasNext && (
-        <div ref={loadMoreRef} className="flex justify-center pt-8 pb-4 min-h-[60px]">
+        <div
+          ref={loadMoreRef}
+          className="flex justify-center pt-8 pb-4 min-h-[60px]"
+        >
           {isLoadingMore ? (
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           ) : (
@@ -160,4 +132,3 @@ export function MarketList({
     </div>
   );
 }
-

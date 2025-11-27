@@ -5,6 +5,12 @@
  *
  * Displays historical price data for all market outcomes in a multi-line chart.
  * Uses recharts via shadcn chart components for a polished, interactive chart.
+ *
+ * Features:
+ * - Multi-outcome line chart
+ * - Timeframe selection (24h, 7d, 30d, All)
+ * - Interactive tooltips
+ * - Optional legend display
  */
 
 import { useMemo, useState } from "react";
@@ -17,6 +23,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
+import { getOutcomeColor } from "@/lib/outcome-colors";
+import { formatChartDate, formatTooltipDate, formatPricePercent } from "@/lib/formatters";
 import type { Outcome } from "@/lib/types";
 
 // =============================================================================
@@ -32,64 +40,23 @@ interface PriceChartProps {
 }
 
 // =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatDateForTimeframe(timestamp: number, timeframe: TimeFrame): string {
-  const date = new Date(timestamp * 1000);
-
-  if (timeframe === "24h") {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }
-
-  if (timeframe === "7d") {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      hour12: true,
-    });
-  }
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatTooltipDate(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-// =============================================================================
 // Price Chart Component
 // =============================================================================
 
-export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: PriceChartProps) {
+export function PriceChart({
+  outcomes,
+  selectedOutcomeId,
+  showLegend = false,
+}: PriceChartProps) {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("all");
 
   // Build chart config for all outcomes
   const chartConfig = useMemo<ChartConfig>(() => {
     const config: ChartConfig = {};
     outcomes.forEach((outcome, index) => {
-      let color = `var(--chart-${(index % 10) + 1})`;
-      if (outcome.title.toLowerCase() === "yes") color = "#10b981"; // emerald-500
-      if (outcome.title.toLowerCase() === "no") color = "#f43f5e"; // rose-500
-
       config[`outcome_${outcome.id}`] = {
         label: outcome.title,
-        color,
+        color: getOutcomeColor(outcome.title, index),
       };
     });
     return config;
@@ -101,8 +68,10 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
 
     outcomes.forEach((outcome) => {
       // Handle both snake_case (API) and camelCase (type) field names
-      const priceCharts = (outcome as unknown as Record<string, unknown>).price_charts ?? outcome.priceCharts;
-      
+      const priceCharts =
+        (outcome as unknown as Record<string, unknown>).price_charts ??
+        outcome.priceCharts;
+
       if (!priceCharts || !Array.isArray(priceCharts)) return;
 
       // Find the timeframe data
@@ -113,17 +82,24 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
       if (!timeframeData?.prices) return;
 
       // Add each price point to the map
-      timeframeData.prices.forEach((point: { timestamp: number; value: number }) => {
-        const existing = allPriceData.get(point.timestamp) || { timestamp: point.timestamp };
-        existing[`outcome_${outcome.id}`] = point.value;
-        allPriceData.set(point.timestamp, existing);
-      });
+      timeframeData.prices.forEach(
+        (point: { timestamp: number; value: number }) => {
+          const existing = allPriceData.get(point.timestamp) || {
+            timestamp: point.timestamp,
+          };
+          existing[`outcome_${outcome.id}`] = point.value;
+          allPriceData.set(point.timestamp, existing);
+        }
+      );
     });
 
     // Convert to array and sort by timestamp
-    return Array.from(allPriceData.values()).sort((a, b) => a.timestamp - b.timestamp);
+    return Array.from(allPriceData.values()).sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
   }, [outcomes, timeFrame]);
 
+  // Get the top outcome for displaying change percentage
   const topOutcome = useMemo(() => {
     return outcomes.reduce((top, current) =>
       current.price > top.price ? current : top
@@ -131,9 +107,11 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
   }, [outcomes]);
 
   const changePercent = useMemo(() => {
-    const priceCharts = (topOutcome as unknown as Record<string, unknown>).price_charts ?? topOutcome.priceCharts;
+    const priceCharts =
+      (topOutcome as unknown as Record<string, unknown>).price_charts ??
+      topOutcome.priceCharts;
     if (!priceCharts || !Array.isArray(priceCharts)) return 0;
-    
+
     const timeframeData = priceCharts.find(
       (chart: { timeframe: string }) => chart.timeframe === timeFrame
     );
@@ -150,7 +128,9 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
           {selectedOutcomeId !== undefined && (
             <div className="flex items-center gap-2">
               <p className="text-2xl font-bold tabular-nums">
-                {((outcomes.find(o => o.id === selectedOutcomeId)?.price ?? 0) * 100).toFixed(1)}%
+                {formatPricePercent(
+                  outcomes.find((o) => o.id === selectedOutcomeId)?.price ?? 0
+                )}
               </p>
               <p
                 className={cn(
@@ -167,7 +147,10 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
           )}
         </div>
 
-        <Tabs value={timeFrame} onValueChange={(v) => setTimeFrame(v as TimeFrame)}>
+        <Tabs
+          value={timeFrame}
+          onValueChange={(v) => setTimeFrame(v as TimeFrame)}
+        >
           <TabsList>
             <TabsTrigger value="24h" className="text-xs">
               24H
@@ -210,7 +193,7 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
               axisLine={false}
               tickMargin={8}
               minTickGap={50}
-              tickFormatter={(value) => formatDateForTimeframe(value, timeFrame)}
+              tickFormatter={(value) => formatChartDate(value, timeFrame)}
               stroke="var(--muted-foreground)"
               fontSize={11}
             />
@@ -225,11 +208,16 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
               width={45}
             />
             <ChartTooltip
-              cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "4 4" }}
+              cursor={{
+                stroke: "var(--muted-foreground)",
+                strokeDasharray: "4 4",
+              }}
               content={
                 <ChartTooltipContent
                   labelFormatter={(_, payload) => {
-                    const items = payload as Array<{ payload?: { timestamp?: number } }>;
+                    const items = payload as Array<{
+                      payload?: { timestamp?: number };
+                    }>;
                     if (items?.[0]?.payload?.timestamp) {
                       return formatTooltipDate(items[0].payload.timestamp);
                     }
@@ -241,9 +229,7 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
               }
             />
             {outcomes.map((outcome, index) => {
-              const color =
-                chartConfig[`outcome_${outcome.id}`]?.color ||
-                `var(--chart-${(index % 10) + 1})`;
+              const color = getOutcomeColor(outcome.title, index);
               return (
                 <Line
                   key={outcome.id}
@@ -266,7 +252,8 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
                     fill: "var(--background)",
                   }}
                   strokeOpacity={
-                    selectedOutcomeId === undefined || selectedOutcomeId === outcome.id
+                    selectedOutcomeId === undefined ||
+                    selectedOutcomeId === outcome.id
                       ? 1
                       : 0.3
                   }
@@ -286,9 +273,7 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
       {showLegend && (
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           {outcomes.map((outcome, index) => {
-            const color =
-              chartConfig[`outcome_${outcome.id}`]?.color ||
-              `var(--chart-${(index % 10) + 1})`;
+            const color = getOutcomeColor(outcome.title, index);
             return (
               <div
                 key={outcome.id}
@@ -299,13 +284,11 @@ export function PriceChart({ outcomes, selectedOutcomeId, showLegend = false }: 
               >
                 <div
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{
-                    backgroundColor: color,
-                  }}
+                  style={{ backgroundColor: color }}
                 />
                 <span className="truncate max-w-[150px]">{outcome.title}</span>
                 <span className="text-muted-foreground tabular-nums">
-                  {(outcome.price * 100).toFixed(1)}%
+                  {formatPricePercent(outcome.price)}
                 </span>
               </div>
             );

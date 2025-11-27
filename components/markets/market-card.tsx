@@ -15,40 +15,9 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { BarChart3, Clock } from "lucide-react";
+import { formatCompact, formatTimeRemaining, formatPricePercent } from "@/lib/formatters";
+import { sortBinaryOutcomes } from "@/lib/outcome-colors";
 import type { MarketSummary } from "@/lib/types";
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatCompact(value: number): string {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTimeRemaining(expiresAt: string): string {
-  const now = new Date();
-  const expiry = new Date(expiresAt);
-  const diff = expiry.getTime() - now.getTime();
-
-  if (diff < 0) return "Expired";
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-  if (days > 30) {
-    return expiry.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  }
-  if (days > 0) return `${days}d`;
-  if (hours > 0) return `${hours}h`;
-  return "< 1h";
-}
-
-function formatPercent(price: number): string {
-  return `${(price * 100).toFixed(0)}%`;
-}
 
 // =============================================================================
 // Binary Outcome Component (2 outcomes)
@@ -59,40 +28,31 @@ interface BinaryOutcomeProps {
 }
 
 function BinaryOutcome({ outcomes }: BinaryOutcomeProps) {
-  // Assume binary markets are typically [Outcome A, Outcome B]
-  // Ideally sorted so "Yes" is first or second depending on convention. 
-  // Let's sort by ID or title to be consistent.
-  // For "Yes/No", usually Yes is high price or first.
-  
-  // Find Yes/No if they exist
-  const yesOutcome = outcomes.find(o => o.title.toLowerCase() === 'yes');
-  const noOutcome = outcomes.find(o => o.title.toLowerCase() === 'no');
-  
-  // If Yes/No market, use specific order [Yes, No]
-  const orderedOutcomes = yesOutcome && noOutcome 
-    ? [yesOutcome, noOutcome]
-    : outcomes;
-
+  const orderedOutcomes = sortBinaryOutcomes(outcomes);
   const [outcomeLeft, outcomeRight] = orderedOutcomes;
-  
+
   return (
     <div className="mt-4 space-y-3">
       {/* Probability Bar */}
       <div className="flex items-center justify-between text-sm font-medium mb-1.5 px-0.5">
-        <span className="text-muted-foreground">{formatPercent(outcomeLeft.price)}</span>
-        <span className="text-muted-foreground">{formatPercent(outcomeRight.price)}</span>
+        <span className="text-muted-foreground">
+          {formatPricePercent(outcomeLeft.price, 0)}
+        </span>
+        <span className="text-muted-foreground">
+          {formatPricePercent(outcomeRight.price, 0)}
+        </span>
       </div>
-      
+
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
         {/* Left bar */}
-        <div 
-          className="absolute left-0 top-0 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
+        <div
+          className="absolute left-0 top-0 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
           style={{ width: `${outcomeLeft.price * 100}%` }}
         />
         {/* Right bar */}
-        <div 
-          className="absolute right-0 top-0 h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]" 
-          style={{ width: `${outcomeRight.price * 100}%` }} 
+        <div
+          className="absolute right-0 top-0 h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]"
+          style={{ width: `${outcomeRight.price * 100}%` }}
         />
       </div>
 
@@ -123,17 +83,20 @@ function MultiOutcome({ outcomes }: MultiOutcomeProps) {
   return (
     <div className="mt-3 space-y-2">
       {sortedOutcomes.map((outcome) => (
-        <div key={outcome.id} className="relative overflow-hidden rounded-lg bg-muted/30 p-2 hover:bg-muted/50 transition-colors">
+        <div
+          key={outcome.id}
+          className="relative overflow-hidden rounded-lg bg-muted/30 p-2 hover:bg-muted/50 transition-colors"
+        >
           {/* Progress Bar Background */}
-          <div 
+          <div
             className="absolute inset-0 bg-primary/10"
-            style={{ width: `${outcome.price * 100}%` }} 
+            style={{ width: `${outcome.price * 100}%` }}
           />
-          
+
           <div className="relative flex items-center justify-between gap-3 z-10">
             <span className="text-sm font-medium truncate">{outcome.title}</span>
             <span className="text-sm font-bold tabular-nums text-primary">
-              {formatPercent(outcome.price)}
+              {formatPricePercent(outcome.price, 0)}
             </span>
           </div>
         </div>
@@ -156,7 +119,6 @@ export function MarketCard({ market }: MarketCardProps) {
   return (
     <Link href={`/markets/${market.slug}`} className="block h-full">
       <Card className="group h-full flex flex-col overflow-hidden border border-border/50 bg-card py-0 gap-0 transition-all hover:border-primary/50 hover:shadow-lg dark:hover:shadow-primary/5 hover:-translate-y-1 duration-300">
-        
         {/* Cover Image Area */}
         <div className="relative h-40 w-full z-0">
           {/* Ambient Glow Effect */}
@@ -212,7 +174,9 @@ export function MarketCard({ market }: MarketCardProps) {
           <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-xs font-medium text-muted-foreground">
             {/* Volume */}
             <div className="flex items-center gap-4">
-              <span className="text-foreground/80 tabular-nums">{formatCompact(market.volume24h)} Vol</span>
+              <span className="text-foreground/80 tabular-nums">
+                {formatCompact(market.volume24h)} Vol
+              </span>
             </div>
 
             {/* Right: Date/Time */}
