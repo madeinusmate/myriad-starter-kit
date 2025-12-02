@@ -7,7 +7,10 @@
 
 import { queryOptions, infiniteQueryOptions } from "@tanstack/react-query";
 import { getUserPortfolio, getUserEvents } from "@/lib/myriad-api";
-import type { PortfolioQueryParams, UserEventsQueryParams } from "@/lib/types";
+import { getMockPortfolio, getMockUserEvents } from "@/lib/mock-data";
+import { USE_MOCK_DATA } from "@/lib/config";
+import type { PortfolioQueryParams, UserEventsQueryParams
+ } from "@/lib/types";
 
 // =============================================================================
 // Query Keys
@@ -46,14 +49,19 @@ export function portfolioQueryOptions(
   params: PortfolioQueryParams = {}
 ) {
   return queryOptions({
-    queryKey: portfolioKeys.filtered(baseUrl, address, params),
-    queryFn: () => getUserPortfolio(baseUrl, address, params),
+    queryKey: portfolioKeys.filtered(USE_MOCK_DATA ? "mock" : baseUrl, address, params),
+    queryFn: () => {
+      if (USE_MOCK_DATA) {
+        return Promise.resolve(getMockPortfolio());
+      }
+      return getUserPortfolio(baseUrl, address, params);
+    },
     // Portfolio data changes with trades, keep it fresh
     staleTime: 15 * 1000,
     // Refetch on window focus to catch external changes
     refetchOnWindowFocus: true,
-    // Only fetch when we have both baseUrl and address
-    enabled: Boolean(baseUrl && address),
+    // Only fetch when we have both baseUrl and address (or mock mode)
+    enabled: Boolean((baseUrl && address) || USE_MOCK_DATA),
   });
 }
 
@@ -70,15 +78,20 @@ export function userEventsInfiniteQueryOptions(
   params: UserEventsQueryParams = {}
 ) {
   return infiniteQueryOptions({
-    queryKey: portfolioKeys.events(baseUrl, address, { ...params, page: undefined }),
-    queryFn: ({ pageParam }) => getUserEvents(baseUrl, address, { ...params, page: pageParam as number }),
+    queryKey: portfolioKeys.events(USE_MOCK_DATA ? "mock" : baseUrl, address, { ...params, page: undefined }),
+    queryFn: ({ pageParam }) => {
+      if (USE_MOCK_DATA) {
+        return Promise.resolve(getMockUserEvents());
+      }
+      return getUserEvents(baseUrl, address, { ...params, page: pageParam as number });
+    },
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
       return lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined;
     },
     staleTime: 15 * 1000,
     refetchOnWindowFocus: true,
-    enabled: Boolean(baseUrl && address),
+    enabled: Boolean((baseUrl && address) || USE_MOCK_DATA),
   });
 }
 

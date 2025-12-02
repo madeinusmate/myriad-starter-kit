@@ -1,42 +1,228 @@
 "use client";
 
 /**
- * Portfolio Page
+ * Portfolio Page - Swipe Design
  *
- * Displays the connected user's positions across all markets.
- *
- * Features:
- * - Portfolio summary (total value, P&L)
- * - Tabbed interface for positions and activity
- * - Connect wallet prompt when not connected
- *
- * This page uses extracted components for better maintainability:
- * - ProfileHeader: User profile with P&L summary
- * - PositionsTable: Sortable positions list
- * - ActivityFeed: Trade history
- * - ConnectWalletPrompt: Wallet connection CTA
- * - EmptyState: No data placeholder
+ * Redesigned profile page matching the Tinder-style swipe aesthetic.
+ * Full-screen dark theme with modern card-based layout.
  */
 
+import { useState } from "react";
 import { useAccount } from "wagmi";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { LayoutList, Activity as ActivityIcon } from "lucide-react";
+import Image from "next/image";
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  BarChart3,
+  Clock,
+  ChevronRight,
+  Loader2,
+  ShoppingCart,
+  Banknote,
+} from "lucide-react";
 import { useNetwork } from "@/lib/network-context";
-import { portfolioQueryOptions } from "@/lib/queries";
+import { portfolioQueryOptions, userEventsInfiniteQueryOptions, abstractProfileQueryOptions } from "@/lib/queries";
+import { formatCurrency, formatPercent, formatTimeRemaining } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AuthGate } from "@/components/swipe";
+import { USE_MOCK_DATA } from "@/lib/config";
+import type { Position, MarketEvent } from "@/lib/types";
+import { format } from "date-fns";
 
-// Portfolio components
-import { ProfileHeader } from "@/components/portfolio/profile-header";
-import { PositionsTable } from "@/components/portfolio/positions-table";
-import { ActivityFeed } from "@/components/portfolio/activity-feed";
-import { PortfolioSkeleton } from "@/components/portfolio/skeletons";
+// =============================================================================
+// Position Card Component
+// =============================================================================
 
-// Shared components
-import { ConnectWalletPrompt } from "@/components/ui/connect-wallet-prompt";
-import { EmptyState } from "@/components/ui/empty-state";
+const PositionCard = ({ position }: { position: Position }) => {
+  const isProfitable = position.profit >= 0;
+  const isYes = position.outcomeTitle?.toLowerCase() === "yes";
+
+  return (
+    <Link
+      href={`/markets/${position.marketSlug}`}
+      className="block"
+    >
+      <div className="relative rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:bg-white/10 hover:border-white/20 transition-all group">
+        {/* Profit indicator bar */}
+        <div
+          className={cn(
+            "absolute left-0 top-0 bottom-0 w-1",
+            isProfitable ? "bg-emerald-500" : "bg-rose-500"
+          )}
+        />
+
+        <div className="p-4 pl-5">
+          <div className="flex gap-4">
+            {/* Market Image */}
+            <div className="relative h-16 w-16 shrink-0 rounded-xl overflow-hidden bg-white/5">
+              {position.imageUrl ? (
+                <Image
+                  src={position.imageUrl}
+                  alt=""
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <BarChart3 className="h-6 w-6 text-white/20" />
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-white text-sm leading-tight line-clamp-2 mb-2 group-hover:text-white/90">
+                {position.marketTitle}
+              </h3>
+
+              <div className="flex items-center gap-3">
+                {/* Outcome Badge */}
+                <span
+                  className={cn(
+                    "px-2 py-0.5 rounded-md text-xs font-bold uppercase",
+                    isYes
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : "bg-rose-500/20 text-rose-400"
+                  )}
+                >
+                  {position.outcomeTitle}
+                </span>
+
+                {/* Shares */}
+                <span className="text-xs text-white/50">
+                  {position.shares.toFixed(1)} shares
+                </span>
+              </div>
+            </div>
+
+            {/* Value & P&L */}
+            <div className="flex flex-col items-end justify-center shrink-0">
+              <span className="text-lg font-bold text-white tabular-nums">
+                {formatCurrency(position.value)}
+              </span>
+              <span
+                className={cn(
+                  "text-sm font-semibold tabular-nums",
+                  isProfitable ? "text-emerald-400" : "text-rose-400"
+                )}
+              >
+                {isProfitable ? "+" : ""}
+                {formatCurrency(position.profit)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Chevron */}
+        <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/20 group-hover:text-white/40 transition-colors" />
+      </div>
+    </Link>
+  );
+};
+
+// =============================================================================
+// Activity Item Component
+// =============================================================================
+
+const ActivityItem = ({ event }: { event: MarketEvent }) => {
+  const isBuy = event.action === "buy";
+
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+      {/* Action Icon */}
+      <div
+        className={cn(
+          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+          isBuy ? "bg-emerald-500/20" : "bg-rose-500/20"
+        )}
+      >
+        {isBuy ? (
+          <ShoppingCart className="h-5 w-5 text-emerald-400" />
+        ) : (
+          <Banknote className="h-5 w-5 text-rose-400" />
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">
+          {event.marketTitle}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span
+            className={cn(
+              "text-xs font-semibold uppercase",
+              isBuy ? "text-emerald-400" : "text-rose-400"
+            )}
+          >
+            {event.action}
+          </span>
+          <span className="text-xs text-white/50">
+            {event.shares.toFixed(1)} shares
+          </span>
+        </div>
+      </div>
+
+      {/* Value & Date */}
+      <div className="flex flex-col items-end shrink-0">
+        <span className="text-sm font-bold text-white tabular-nums">
+          {formatCurrency(event.value)}
+        </span>
+        <span className="text-xs text-white/40">
+          {format(new Date(event.timestamp * 1000), "MMM d")}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// Stats Card Component
+// =============================================================================
+
+const StatsCard = ({
+  label,
+  value,
+  icon: Icon,
+  color = "default",
+}: {
+  label: string;
+  value: string;
+  icon: React.ElementType;
+  color?: "default" | "green" | "red";
+}) => (
+  <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/10">
+    <div className="flex items-center gap-2 mb-2">
+      <Icon
+        className={cn(
+          "h-4 w-4",
+          color === "green" && "text-emerald-400",
+          color === "red" && "text-rose-400",
+          color === "default" && "text-white/50"
+        )}
+      />
+      <span className="text-xs text-white/50 uppercase tracking-wider font-medium">
+        {label}
+      </span>
+    </div>
+    <p
+      className={cn(
+        "text-xl font-bold tabular-nums",
+        color === "green" && "text-emerald-400",
+        color === "red" && "text-rose-400",
+        color === "default" && "text-white"
+      )}
+    >
+      {value}
+    </p>
+  </div>
+);
 
 // =============================================================================
 // Page Component
@@ -46,107 +232,187 @@ export default function PortfolioPage() {
   const { status, address } = useAccount();
   const isConnected = status === "connected";
   const { apiBaseUrl, networkConfig } = useNetwork();
+  const [activeTab, setActiveTab] = useState<"positions" | "activity">("positions");
 
-  // Fetch portfolio data
-  const { data, isPending, error } = useQuery({
+  // Fetch profile
+  const { data: profile } = useQuery(abstractProfileQueryOptions(address));
+
+  // Fetch portfolio
+  const { data: portfolioData, isPending: isPortfolioPending } = useQuery({
     ...portfolioQueryOptions(apiBaseUrl, address ?? "", {
       networkId: networkConfig.id,
     }),
-    enabled: Boolean(address),
+    enabled: Boolean(address) || USE_MOCK_DATA,
   });
 
-  // Not connected
-  if (!isConnected) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-12">
-          <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
-          <p className="mt-2 text-muted-foreground">
-            Track your positions and claim winnings.
-          </p>
-        </div>
-        <ConnectWalletPrompt />
-      </div>
-    );
+  // Fetch activity
+  const { data: activityData, isPending: isActivityPending } = useInfiniteQuery({
+    ...userEventsInfiniteQueryOptions(apiBaseUrl, address ?? "", {
+      networkId: networkConfig.id,
+    }),
+    enabled: Boolean(address) || USE_MOCK_DATA,
+  });
+
+  // Show auth gate if not connected and not using mock data
+  if (!isConnected && !USE_MOCK_DATA) {
+    return <AuthGate />;
   }
 
+  const positions = portfolioData?.data ?? [];
+  const events = activityData?.pages.flatMap((page) => page.data) ?? [];
+
+  // Calculate stats
+  const totalValue = positions.reduce((sum, p) => sum + p.value, 0);
+  const totalProfit = positions.reduce((sum, p) => sum + p.profit, 0);
+  const totalInvested = positions.reduce((sum, p) => sum + (p.invested ?? p.value - p.profit), 0);
+  const isProfitable = totalProfit >= 0;
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 min-h-screen">
-      {/* Loading State */}
-      {isPending && <PortfolioSkeleton />}
-
-      {/* Error State */}
-      {error && (
-        <Card className="mt-8 border-destructive/50">
-          <CardContent className="p-6 text-center">
-            <p className="text-destructive font-medium">
-              Failed to load portfolio data. Please try again later.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Portfolio Content */}
-      {data && address && (
-        <div className="space-y-8">
-          {/* 1. Profile Header with P&L */}
-          <ProfileHeader address={address} positions={data.data} />
-
-          {/* 2. Main Content - Tabs */}
-          <Tabs
-            defaultValue="positions"
-            className="w-full rounded-xl border border-border/50 bg-card overflow-hidden gap-0"
+    <div className="fixed inset-0 z-[100] bg-zinc-950 overflow-hidden">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
+        <Link href="/">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-12 w-12 rounded-full bg-black/20 backdrop-blur-xl border border-white/10 hover:bg-black/40 hover:border-white/20 transition-all"
           >
-            <div className="border-b border-border/50 bg-muted/30 px-4 py-3 flex items-center">
-              <TabsList className="bg-muted/50 h-9 p-1">
-                <TabsTrigger
-                  value="positions"
-                  className="gap-2 px-3 text-xs font-medium"
-                >
-                  <LayoutList className="h-3.5 w-3.5" />
-                  Positions
-                  <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full leading-none">
-                    {data.data.length}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="activity"
-                  className="gap-2 px-3 text-xs font-medium"
-                >
-                  <ActivityIcon className="h-3.5 w-3.5" />
-                  Activity
-                </TabsTrigger>
-              </TabsList>
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </Button>
+        </Link>
+
+        <h1 className="text-lg font-bold text-white">Profile</h1>
+
+        <div className="w-12" /> {/* Spacer for centering */}
+      </header>
+
+      {/* Content */}
+      <div className="h-full overflow-y-auto pt-20 pb-8 px-4">
+        <div className="max-w-lg mx-auto space-y-6">
+          {/* Profile Section */}
+          <div className="flex flex-col items-center text-center pt-4">
+            <div className="relative mb-4">
+              <div className="absolute -inset-1 bg-gradient-to-br from-emerald-500 to-violet-500 rounded-full opacity-50 blur-md" />
+              <Avatar className="h-24 w-24 border-2 border-zinc-900 relative">
+                {profile?.profilePictureUrl && (
+                  <AvatarImage src={profile.profilePictureUrl} alt="Profile" />
+                )}
+                {address && (
+                  <AvatarImage src={`https://avatar.vercel.sh/${address}`} alt="Profile" />
+                )}
+                <AvatarFallback className="bg-zinc-800 text-white text-2xl">
+                  {address?.slice(0, 2) || "?"}
+                </AvatarFallback>
+              </Avatar>
             </div>
 
-            <TabsContent value="positions" className="m-0 outline-none">
-              {data.data.length === 0 ? (
-                <div className="p-6 sm:p-12">
-                  <EmptyState
-                    icon={<LayoutList className="h-8 w-8 text-muted-foreground" />}
-                    title="No Positions Yet"
-                    description="You don't have any positions. Start trading on prediction markets to build your portfolio."
-                    action={
-                      <Button asChild>
-                        <Link href="/">Browse Markets</Link>
-                      </Button>
-                    }
-                  />
+            <h2 className="text-2xl font-bold text-white mb-1">
+              {profile?.name || "Abstract User"}
+            </h2>
+            <p className="text-sm text-white/50 font-mono">
+              {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected"}
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatsCard
+              label="Portfolio Value"
+              value={formatCurrency(totalValue)}
+              icon={Wallet}
+            />
+            <StatsCard
+              label="Total P&L"
+              value={`${isProfitable ? "+" : ""}${formatCurrency(totalProfit)}`}
+              icon={isProfitable ? TrendingUp : TrendingDown}
+              color={isProfitable ? "green" : "red"}
+            />
+          </div>
+
+          {/* Tab Switcher */}
+          <div className="flex p-1 rounded-xl bg-white/5 border border-white/10">
+            <button
+              onClick={() => setActiveTab("positions")}
+              className={cn(
+                "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                activeTab === "positions"
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:text-white/70"
+              )}
+            >
+              Positions ({positions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("activity")}
+              className={cn(
+                "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                activeTab === "activity"
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:text-white/70"
+              )}
+            >
+              Activity
+            </button>
+          </div>
+
+          {/* Positions Tab */}
+          {activeTab === "positions" && (
+            <div className="space-y-3">
+              {isPortfolioPending ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 text-white/50 animate-spin" />
+                </div>
+              ) : positions.length === 0 ? (
+                <div className="text-center py-12">
+                  <BarChart3 className="h-12 w-12 text-white/20 mx-auto mb-4" />
+                  <p className="text-white/60 font-medium mb-2">No positions yet</p>
+                  <p className="text-white/40 text-sm mb-6">
+                    Start trading to build your portfolio
+                  </p>
+                  <Link href="/">
+                    <Button className="bg-white text-zinc-900 hover:bg-white/90">
+                      Browse Markets
+                    </Button>
+                  </Link>
                 </div>
               ) : (
-                <PositionsTable
-                  positions={data.data}
-                  className="border-0 rounded-none"
-                />
+                positions.map((position) => (
+                  <PositionCard
+                    key={`${position.marketId}-${position.outcomeId}`}
+                    position={position}
+                  />
+                ))
               )}
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="activity" className="m-0 outline-none">
-              <ActivityFeed className="border-0 rounded-none" />
-            </TabsContent>
-          </Tabs>
+          {/* Activity Tab */}
+          {activeTab === "activity" && (
+            <div className="space-y-3">
+              {isActivityPending ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 text-white/50 animate-spin" />
+                </div>
+              ) : events.length === 0 ? (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 text-white/20 mx-auto mb-4" />
+                  <p className="text-white/60 font-medium mb-2">No activity yet</p>
+                  <p className="text-white/40 text-sm">
+                    Your trading history will appear here
+                  </p>
+                </div>
+              ) : (
+                events.map((event, idx) => (
+                  <ActivityItem
+                    key={`${event.marketId}-${event.timestamp}-${idx}`}
+                    event={event}
+                  />
+                ))
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

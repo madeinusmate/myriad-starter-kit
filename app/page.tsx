@@ -1,128 +1,171 @@
 "use client";
 
 /**
- * Markets Page
+ * Swipe Markets Page
  *
- * Main landing page displaying all available prediction markets.
+ * Tinder-style swipe interface for browsing and betting on prediction markets.
  * Features:
- * - Search and filter markets
- * - Sort by volume, liquidity, etc.
- * - Paginated grid of market cards
+ * - Full-screen swipeable card stack
+ * - Quick bet buttons (Yes/No)
+ * - Card flip for market details
+ * - Filter by category and sort order
  */
 
-import { useState, useCallback, useRef, useEffect, Suspense } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAccount } from "wagmi";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { useNetwork } from "@/lib/network-context";
-import { marketsInfiniteQueryOptions } from "@/lib/queries";
-import { MarketFilters, type MarketFiltersValue } from "@/components/markets/market-filters";
-import { MarketList } from "@/components/markets/market-list";
+import { swipeMarketsQueryOptions } from "@/lib/queries";
+import { getQuote } from "@/lib/myriad-api";
+import { useTrade } from "@/lib/mutations";
+import { QUICK_BET_AMOUNT, USE_MOCK_DATA } from "@/lib/config";
+import { SwipeHeader, CardStack, AuthGate, type SwipeFilters } from "@/components/swipe";
+import type { MarketSummary } from "@/lib/types";
 
 // =============================================================================
 // Page Component
 // =============================================================================
 
-function MarketsPageContent() {
-  const { apiBaseUrl, networkConfig, tokens } = useNetwork();
-  const searchParams = useSearchParams();
-  const urlKeyword = searchParams.get("q") || undefined;
+export default function SwipeMarketsPage() {
+  const { status, address } = useAccount();
+  const isConnected = status === "connected";
+  const { apiBaseUrl, tokens } = useNetwork();
+  const queryClient = useQueryClient();
 
-  const [filters, setFilters] = useState<MarketFiltersValue>({
+  const [filters, setFilters] = useState<SwipeFilters>({
     sort: "volume_24h",
-    state: "open",
+    topics: undefined,
   });
 
-  const {
-    data,
-    isPending,
-    isFetchingNextPage,
-    fetchNextPage,
-    hasNextPage,
-  } = useInfiniteQuery({
-    ...marketsInfiniteQueryOptions(apiBaseUrl, {
-      limit: 12,
+  // Fetch markets
+  const { data, isPending, error } = useQuery({
+    ...swipeMarketsQueryOptions(apiBaseUrl, {
       networkId: 2741,
       tokenAddress: tokens.USDC.address,
-      keyword: urlKeyword,
       state: "open",
       sort: filters.sort,
-      // Categories must be capitalized for the API (e.g. "Crypto" not "crypto")
-      topics: filters.topics && filters.topics !== "all" 
-        ? filters.topics.charAt(0).toUpperCase() + filters.topics.slice(1) 
+      topics: filters.topics
+        ? filters.topics.charAt(0).toUpperCase() + filters.topics.slice(1)
         : undefined,
-      order: "desc",
     }),
   });
 
-  const loadMoreRef = useRef<HTMLDivElement>(null);
+  // Trade mutation
+  const { trade, isPending: isTradePending, status: tradeStatus } = useTrade();
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 }
-    );
+  // Quote mutation for getting trade details before executing
+  const quoteMutation = useMutation({
+    mutationFn: async ({ market, outcomeId }: { market: MarketSummary; outcomeId: number }) => {
+      const quote = await getQuote(apiBaseUrl, {
+        marketSlug: market.slug,
+        outcomeId,
+        action: "buy",
+        value: QUICK_BET_AMOUNT,
+      });
+      return { quote, market, outcomeId };
+    },
+  });
 
-    const currentRef = loadMoreRef.current;
-    if (currentRef) {
-      observer.observe(currentRef);
-    }
-
-    return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef);
+  const handleBet = useCallback(
+    async (market: MarketSummary, outcomeId: number) => {
+      if (!isConnected) {
+        toast.error("Please connect your wallet first");
+        return;
       }
-    };
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleFiltersChange = useCallback((newFilters: MarketFiltersValue) => {
+      if (USE_MOCK_DATA) {
+        toast.success("Mock bet placed!", {
+          description: `You bet $${QUICK_BET_AMOUNT} on ${market.outcomes.find(o => o.id === outcomeId)?.title}`,
+        });
+        return;
+      }
+
+      try {
+        // Get quote first
+        toast.loading("Getting quote...", { id: "quick-bet" });
+        
+        const { quote } = await quoteMutation.mutateAsync({ market, outcomeId });
+
+        toast.loading("Confirm in wallet...", { id: "quick-bet" });
+
+        // Execute trade
+        await trade({
+          action: "buy",
+          marketId: market.id,
+          outcomeId,
+          value: QUICK_BET_AMOUNT,
+          sharesThreshold: quote.sharesThreshold,
+          tokenAddress: market.tokenAddress,
+          tokenDecimals: 6,
+        });
+
+        toast.dismiss("quick-bet");
+      } catch (error) {
+        console.error("Quick bet failed:", error);
+        toast.dismiss("quick-bet");
+        toast.error("Bet failed", {
+          description: error instanceof Error ? error.message : "Please try again",
+        });
+      }
+    },
+    [isConnected, quoteMutation, trade, apiBaseUrl]
+  );
+
+  const handleFiltersChange = useCallback((newFilters: SwipeFilters) => {
     setFilters(newFilters);
   }, []);
 
-  const rawMarkets = data?.pages.flatMap((page) => page.data) ?? [];
-  const markets = rawMarkets.filter(market => {
+  // Filter out expired markets
+  const markets = (data?.data ?? []).filter((market) => {
     if (!market.expiresAt) return true;
     return new Date(market.expiresAt).getTime() > Date.now();
   });
 
-  const lastPage = data?.pages[data.pages.length - 1];
+  // Show auth gate if not connected (skip in mock mode)
+  if (!isConnected && !USE_MOCK_DATA) {
+    return <AuthGate />;
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Prediction Markets</h1>
-        <p className="mt-2 text-muted-foreground">
-          Trade on the outcomes of real-world events on{" "}
-          <span className="font-medium text-foreground">{networkConfig.name}</span>
-        </p>
+    <div className="fixed inset-0 z-[100] bg-zinc-950 overflow-hidden">
+      {/* Header */}
+      <SwipeHeader filters={filters} onFiltersChange={handleFiltersChange} />
+
+      {/* Main Content */}
+      <div className="h-full w-full pt-20 pb-4 px-4">
+        {isPending ? (
+          <div className="h-full flex items-center justify-center">
+            <Loader2 className="h-8 w-8 text-white/50 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center text-white/60">
+              <p className="text-lg font-medium">Failed to load markets</p>
+              <p className="text-sm mt-1">Please try again later</p>
+            </div>
+          </div>
+        ) : (
+          <CardStack
+            markets={markets}
+            onBet={handleBet}
+            isPending={isTradePending || quoteMutation.isPending}
+          />
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
-        <MarketFilters value={filters} onChange={handleFiltersChange} />
-      </div>
-
-      {/* Market List */}
-      <MarketList
-        markets={markets}
-        pagination={lastPage?.pagination}
-        isLoading={isPending}
-        onLoadMore={() => fetchNextPage()}
-        isLoadingMore={isFetchingNextPage}
-        loadMoreRef={loadMoreRef}
-      />
+      {/* Trade status indicator */}
+      {(tradeStatus === "approving" || tradeStatus === "confirming" || tradeStatus === "pending_signature") && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center gap-3">
+          <Loader2 className="h-4 w-4 text-white animate-spin" />
+          <span className="text-sm font-medium text-white">
+            {tradeStatus === "approving" && "Approving..."}
+            {tradeStatus === "pending_signature" && "Confirm in wallet..."}
+            {tradeStatus === "confirming" && "Confirming..."}
+          </span>
+        </div>
+      )}
     </div>
-  );
-}
-
-export default function MarketsPage() {
-  return (
-    <Suspense fallback={<div className="mx-auto max-w-7xl px-4 py-8 h-screen" />}>
-      <MarketsPageContent />
-    </Suspense>
   );
 }

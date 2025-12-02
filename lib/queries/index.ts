@@ -10,6 +10,7 @@ export {
   marketKeys, 
   marketsInfiniteQueryOptions,
   marketQueryOptions,
+  swipeMarketsQueryOptions,
 } from "./markets";
 
 // Portfolio

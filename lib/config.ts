@@ -112,3 +112,22 @@ export const DEFAULT_SLIPPAGE = 0.005;
  */
 export const DEFAULT_PAGE_SIZE = 20;
 
+// =============================================================================
+// Quick Bet Configuration
+// =============================================================================
+
+/**
+ * Fixed amount for quick bets in the swipe UI (in USDC)
+ */
+export const QUICK_BET_AMOUNT = 5;
+
+// =============================================================================
+// Mock Data Configuration
+// =============================================================================
+
+/**
+ * Enable mock data for development/testing.
+ * Set NEXT_PUBLIC_USE_MOCK_DATA=true in your .env file
+ */
+export const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
+

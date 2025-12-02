@@ -161,6 +161,31 @@
   }
 }
 
+/* Swipe card styles */
+.swipe-card-flip {
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.swipe-card-flip.flipped {
+  transform: rotateY(180deg);
+}
+
+.swipe-card-face {
+  backface-visibility: hidden;
+}
+
+.swipe-card-back {
+  transform: rotateY(180deg);
+}
+
+/* Prevent text selection during swipe */
+.touch-none {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Nested list indentation for markdown rules */
 .prose ol {
   margin-left: 1.5rem;

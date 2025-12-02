@@ -7,7 +7,9 @@
 
 import { queryOptions, infiniteQueryOptions } from "@tanstack/react-query";
 import { getMarkets, getMarket } from "@/lib/myriad-api";
-import type { MarketsQueryParams } from "@/lib/types";
+import { getMockMarkets } from "@/lib/mock-data";
+import { USE_MOCK_DATA } from "@/lib/config";
+import type { MarketsQueryParams, MarketsResponse } from "@/lib/types";
 
 // =============================================================================
 // Query Keys
@@ -55,6 +57,42 @@ export function marketsInfiniteQueryOptions(baseUrl: string, params: MarketsQuer
     refetchOnMount: false,
     // Enabled only when we have a base URL
     enabled: Boolean(baseUrl),
+  });
+}
+
+/**
+ * Query options for fetching markets for the swipe UI.
+ * Uses mock data when USE_MOCK_DATA is enabled.
+ *
+ * @param baseUrl - API base URL
+ * @param params - Filter parameters
+ */
+export function swipeMarketsQueryOptions(baseUrl: string, params: MarketsQueryParams = {}) {
+  return queryOptions({
+    queryKey: ["swipe-markets", USE_MOCK_DATA ? "mock" : baseUrl, params],
+    queryFn: async (): Promise<MarketsResponse> => {
+      if (USE_MOCK_DATA) {
+        const markets = getMockMarkets({
+          topics: params.topics,
+          sort: params.sort,
+        });
+        return {
+          data: markets,
+          pagination: {
+            page: 1,
+            limit: markets.length,
+            total: markets.length,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          },
+        };
+      }
+      return getMarkets(baseUrl, { ...params, limit: 50 });
+    },
+    staleTime: 30 * 1000,
+    refetchOnMount: false,
+    enabled: Boolean(baseUrl) || USE_MOCK_DATA,
   });
 }
 
