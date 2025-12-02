@@ -17,10 +17,11 @@ import { useAccount } from "wagmi";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useNetwork } from "@/lib/network-context";
+import { useBetSettings } from "@/lib/bet-settings-context";
 import { swipeMarketsQueryOptions } from "@/lib/queries";
 import { getQuote } from "@/lib/myriad-api";
 import { useTrade } from "@/lib/mutations";
-import { QUICK_BET_AMOUNT, USE_MOCK_DATA } from "@/lib/config";
+import { USE_MOCK_DATA } from "@/lib/config";
 import { SwipeHeader, CardStack, AuthGate, type SwipeFilters } from "@/components/swipe";
 import type { MarketSummary } from "@/lib/types";
 
@@ -32,6 +33,7 @@ export default function SwipeMarketsPage() {
   const { status, address } = useAccount();
   const isConnected = status === "connected";
   const { apiBaseUrl, tokens } = useNetwork();
+  const { quickBetAmount } = useBetSettings();
   const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<SwipeFilters>({
@@ -57,14 +59,14 @@ export default function SwipeMarketsPage() {
 
   // Quote mutation for getting trade details before executing
   const quoteMutation = useMutation({
-    mutationFn: async ({ market, outcomeId }: { market: MarketSummary; outcomeId: number }) => {
+    mutationFn: async ({ market, outcomeId, amount }: { market: MarketSummary; outcomeId: number; amount: number }) => {
       const quote = await getQuote(apiBaseUrl, {
         marketSlug: market.slug,
         outcomeId,
         action: "buy",
-        value: QUICK_BET_AMOUNT,
+        value: amount,
       });
-      return { quote, market, outcomeId };
+      return { quote, market, outcomeId, amount };
     },
   });
 
@@ -77,7 +79,7 @@ export default function SwipeMarketsPage() {
 
       if (USE_MOCK_DATA) {
         toast.success("Mock bet placed!", {
-          description: `You bet $${QUICK_BET_AMOUNT} on ${market.outcomes.find(o => o.id === outcomeId)?.title}`,
+          description: `You bet $${quickBetAmount} on ${market.outcomes.find(o => o.id === outcomeId)?.title}`,
         });
         return;
       }
@@ -86,7 +88,7 @@ export default function SwipeMarketsPage() {
         // Get quote first
         toast.loading("Getting quote...", { id: "quick-bet" });
         
-        const { quote } = await quoteMutation.mutateAsync({ market, outcomeId });
+        const { quote, amount } = await quoteMutation.mutateAsync({ market, outcomeId, amount: quickBetAmount });
 
         toast.loading("Confirm in wallet...", { id: "quick-bet" });
 
@@ -95,7 +97,7 @@ export default function SwipeMarketsPage() {
           action: "buy",
           marketId: market.id,
           outcomeId,
-          value: QUICK_BET_AMOUNT,
+          value: amount,
           sharesThreshold: quote.sharesThreshold,
           tokenAddress: market.tokenAddress,
           tokenDecimals: 6,
@@ -110,7 +112,7 @@ export default function SwipeMarketsPage() {
         });
       }
     },
-    [isConnected, quoteMutation, trade, apiBaseUrl]
+    [isConnected, quoteMutation, trade, quickBetAmount]
   );
 
   const handleFiltersChange = useCallback((newFilters: SwipeFilters) => {

@@ -23,13 +23,17 @@ import {
   Loader2,
   ShoppingCart,
   Banknote,
+  Settings,
+  Zap,
 } from "lucide-react";
 import { useNetwork } from "@/lib/network-context";
+import { useBetSettings } from "@/lib/bet-settings-context";
 import { portfolioQueryOptions, userEventsInfiniteQueryOptions, abstractProfileQueryOptions } from "@/lib/queries";
-import { formatCurrency, formatPercent, formatTimeRemaining } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AuthGate } from "@/components/swipe";
 import { USE_MOCK_DATA } from "@/lib/config";
 import type { Position, MarketEvent } from "@/lib/types";
@@ -228,11 +232,94 @@ const StatsCard = ({
 // Page Component
 // =============================================================================
 
+// =============================================================================
+// Quick Bet Settings Component
+// =============================================================================
+
+const PRESET_AMOUNTS = [1, 5, 10, 25, 50, 100];
+
+const QuickBetSettings = () => {
+  const { quickBetAmount, setQuickBetAmount } = useBetSettings();
+  const [inputValue, setInputValue] = useState(quickBetAmount.toString());
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    const parsed = parseFloat(value);
+    if (!isNaN(parsed) && parsed > 0 && parsed <= 1000) {
+      setQuickBetAmount(parsed);
+    }
+  };
+
+  const handlePresetClick = (amount: number) => {
+    setInputValue(amount.toString());
+    setQuickBetAmount(amount);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Section Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+          <Zap className="h-5 w-5 text-amber-400" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-white">Quick Bet Amount</h3>
+          <p className="text-xs text-white/50">Default amount for swipe bets</p>
+        </div>
+      </div>
+
+      {/* Amount Input */}
+      <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 font-medium">
+          $
+        </span>
+        <Input
+          type="number"
+          value={inputValue}
+          onChange={(e) => handleInputChange(e.target.value)}
+          min="1"
+          max="1000"
+          step="1"
+          className="pl-8 h-14 text-xl font-bold bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+          placeholder="5"
+        />
+      </div>
+
+      {/* Preset Buttons */}
+      <div className="grid grid-cols-3 gap-2">
+        {PRESET_AMOUNTS.map((amount) => (
+          <button
+            key={amount}
+            onClick={() => handlePresetClick(amount)}
+            className={cn(
+              "py-3 rounded-xl font-bold text-sm transition-all",
+              quickBetAmount === amount
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            ${amount}
+          </button>
+        ))}
+      </div>
+
+      {/* Info Text */}
+      <p className="text-xs text-white/40 text-center">
+        This amount will be used when you tap Yes/No on market cards
+      </p>
+    </div>
+  );
+};
+
+// =============================================================================
+// Page Component
+// =============================================================================
+
 export default function PortfolioPage() {
   const { status, address } = useAccount();
   const isConnected = status === "connected";
   const { apiBaseUrl, networkConfig } = useNetwork();
-  const [activeTab, setActiveTab] = useState<"positions" | "activity">("positions");
+  const [activeTab, setActiveTab] = useState<"positions" | "activity" | "settings">("positions");
 
   // Fetch profile
   const { data: profile } = useQuery(abstractProfileQueryOptions(address));
@@ -340,7 +427,7 @@ export default function PortfolioPage() {
                   : "text-white/50 hover:text-white/70"
               )}
             >
-              Positions ({positions.length})
+                  Positions
             </button>
             <button
               onClick={() => setActiveTab("activity")}
@@ -351,9 +438,21 @@ export default function PortfolioPage() {
                   : "text-white/50 hover:text-white/70"
               )}
             >
-              Activity
+                  Activity
             </button>
-          </div>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={cn(
+                "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5",
+                activeTab === "settings"
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:text-white/70"
+              )}
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </button>
+            </div>
 
           {/* Positions Tab */}
           {activeTab === "positions" && (
@@ -372,7 +471,7 @@ export default function PortfolioPage() {
                   <Link href="/">
                     <Button className="bg-white text-zinc-900 hover:bg-white/90">
                       Browse Markets
-                    </Button>
+                      </Button>
                   </Link>
                 </div>
               ) : (
@@ -409,6 +508,13 @@ export default function PortfolioPage() {
                   />
                 ))
               )}
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === "settings" && (
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+              <QuickBetSettings />
             </div>
           )}
         </div>

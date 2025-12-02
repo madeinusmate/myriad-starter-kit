@@ -16,7 +16,7 @@ import { Info, Clock, TrendingUp, BarChart3, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompact, formatTimeRemaining, formatPricePercent } from "@/lib/formatters";
 import { sortBinaryOutcomes } from "@/lib/outcome-colors";
-import { QUICK_BET_AMOUNT } from "@/lib/config";
+import { useBetSettings } from "@/lib/bet-settings-context";
 import type { MarketSummary } from "@/lib/types";
 
 // =============================================================================
@@ -40,9 +40,10 @@ interface CardFrontProps {
   onFlip: () => void;
   isPending?: boolean;
   dragX?: number;
+  quickBetAmount: number;
 }
 
-const CardFront = ({ market, onBet, onFlip, isPending, dragX = 0 }: CardFrontProps) => {
+const CardFront = ({ market, onBet, onFlip, isPending, dragX = 0, quickBetAmount }: CardFrontProps) => {
   const orderedOutcomes = sortBinaryOutcomes(market.outcomes);
   const [yesOutcome, noOutcome] = orderedOutcomes;
   
@@ -159,7 +160,7 @@ const CardFront = ({ market, onBet, onFlip, isPending, dragX = 0 }: CardFrontPro
           >
             <span className="block">Yes</span>
             <span className="block text-xs font-medium opacity-80 mt-0.5">
-              ${QUICK_BET_AMOUNT}
+              ${quickBetAmount}
             </span>
           </button>
           <button
@@ -178,7 +179,7 @@ const CardFront = ({ market, onBet, onFlip, isPending, dragX = 0 }: CardFrontPro
           >
             <span className="block">No</span>
             <span className="block text-xs font-medium opacity-80 mt-0.5">
-              ${QUICK_BET_AMOUNT}
+              ${quickBetAmount}
             </span>
           </button>
         </div>
@@ -320,6 +321,7 @@ const CardBack = ({ market, onFlip }: CardBackProps) => {
 
 export const SwipeCard = ({ market, onBet, isPending, dragX }: SwipeCardProps) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const { quickBetAmount } = useBetSettings();
 
   const handleFlip = () => setIsFlipped((prev) => !prev);
   const handleBet = (outcomeId: number) => onBet(market, outcomeId);
@@ -354,6 +356,7 @@ export const SwipeCard = ({ market, onBet, isPending, dragX }: SwipeCardProps) =
             onFlip={handleFlip}
             isPending={isPending}
             dragX={dragX}
+            quickBetAmount={quickBetAmount}
           />
         </div>
 
