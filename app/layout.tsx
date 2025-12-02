@@ -19,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Myriad Starter Kit",
+  title: "SwipeStakes",
   description: "Build prediction market apps on Abstract with Myriad Protocol",
 };
 

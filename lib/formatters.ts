@@ -1,7 +1,7 @@
 /**
  * Formatters Utility
  *
- * Shared formatting functions used throughout the Myriad Starter Kit.
+ * Shared formatting functions used throughout the SwipeStakes.
  * Centralizes all number, currency, date, and percentage formatting.
  */
 

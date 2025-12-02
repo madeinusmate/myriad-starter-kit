@@ -1,7 +1,7 @@
 /**
  * Type Exports
  *
- * Central export file for all TypeScript types used in the Myriad Starter Kit.
+ * Central export file for all TypeScript types used in the SwipeStakes.
  * Import from '@/lib/types' for convenient access to all types.
  */
 

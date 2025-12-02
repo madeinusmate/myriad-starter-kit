@@ -79,7 +79,7 @@ export default function SwipeMarketsPage() {
       }
 
       if (USE_MOCK_DATA) {
-        toast.success("Mock bet placed!", {
+        toast.success("Bet placed!", {
           description: `You bet $${quickBetAmount} on ${market.outcomes.find(o => o.id === outcomeId)?.title}`,
         });
         return;

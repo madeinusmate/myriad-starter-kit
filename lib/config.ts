@@ -1,5 +1,5 @@
 /**
- * Myriad Starter Kit Configuration
+ * SwipeStakes Configuration
  *
  * This file contains all network configurations, contract addresses, and API settings.
  * Myriad is deployed on Abstract (and other chains), but this starter kit focuses on Abstract.

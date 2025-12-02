@@ -28,6 +28,7 @@ import {
   LogOut,
   Hand,
   MousePointerClick,
+  ArrowUpRight,
 } from "lucide-react";
 import { useNetwork } from "@/lib/network-context";
 import { useBetSettings } from "@/lib/bet-settings-context";
@@ -42,6 +43,7 @@ import { USE_MOCK_DATA } from "@/lib/config";
 import type { Position, MarketEvent } from "@/lib/types";
 import { format } from "date-fns";
 import { AuroraBackground } from "@/components/ui/aurora-background";
+import { RainbowButton } from "@/components/ui/rainbow-button";
 
 // =============================================================================
 // Position Card Component
@@ -399,7 +401,7 @@ const InteractionModeSettings = () => {
       {/* Visual Hint */}
       <div className={cn(
         "p-3 rounded-xl border text-center text-sm",
-        interactionMode === "tap" 
+        interactionMode === "tap"
           ? "bg-white/5 border-white/10 text-white/50"
           : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
       )}>
@@ -460,7 +462,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden">
-      <AuroraBackground/>
+      <AuroraBackground />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
         <Link href="/">
@@ -505,6 +507,7 @@ export default function PortfolioPage() {
               </Avatar>
             </div>
 
+
             <h2 className="text-2xl font-bold text-white mb-1">
               {profile?.name || "Abstract User"}
             </h2>
@@ -512,6 +515,16 @@ export default function PortfolioPage() {
               {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected"}
             </p>
           </div>
+          <RainbowButton
+            className="flex gap-2 h-9 group relative overflow-hidden pr-3"
+            asChild
+          >
+            <a href="https://portal.abs.xyz/onramp" target="_blank" rel="noopener noreferrer">
+              Deposit Funds
+              <ArrowUpRight className="h-4 w-4 ml-0.5 transition-transform duration-300 group-hover:-translate-y-1 group-hover:translate-x-1" />
+            </a>
+          </RainbowButton>
+
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3">
@@ -571,7 +584,7 @@ export default function PortfolioPage() {
                   <Link href="/">
                     <Button className="bg-white text-zinc-900 hover:bg-white/90">
                       Browse Markets
-                      </Button>
+                    </Button>
                   </Link>
                 </div>
               ) : (

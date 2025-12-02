@@ -1,4 +1,4 @@
-# Myriad Starter Kit
+# SwipeStakes
 
 A developer-friendly starter kit for building prediction market applications on [Myriad Protocol](https://myriadprotocol.com) and [Abstract](https://abs.xyz).
 
