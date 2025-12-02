@@ -106,6 +106,7 @@ export function useTrade() {
             onClick: () => window.open(explorerUrl, "_blank"),
           } : undefined,
           duration: 5000,
+          position: "top-center",
         }
       );
       
@@ -130,6 +131,7 @@ export function useTrade() {
       toast.error("Transaction failed", {
         description: "The transaction was reverted on-chain. Please try again.",
         duration: 5000,
+        position: "top-center",
       });
       
       setTimeout(() => {

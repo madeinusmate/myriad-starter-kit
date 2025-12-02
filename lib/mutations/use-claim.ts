@@ -98,6 +98,7 @@ export function useClaim() {
             onClick: () => window.open(explorerUrl, "_blank"),
           } : undefined,
           duration: 5000,
+          position: "top-center",
         }
       );
 
@@ -122,6 +123,7 @@ export function useClaim() {
       toast.error("Claim failed", {
         description: "The transaction was reverted on-chain. Please try again.",
         duration: 5000,
+        position: "top-center",
       });
 
       setTimeout(() => {
@@ -185,6 +187,7 @@ export function useClaim() {
       toast.error("Claim failed", {
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         duration: 5000,
+        position: "top-center",
       });
 
       setTimeout(() => {

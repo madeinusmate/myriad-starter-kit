@@ -74,24 +74,28 @@ export default function SwipeMarketsPage() {
   const handleBet = useCallback(
     async (market: MarketSummary, outcomeId: number) => {
       if (!isConnected) {
-        toast.error("Please connect your wallet first");
+        toast.error("Please connect your wallet first", {
+          position: "top-center"
+        });
+        
         return;
       }
 
       if (USE_MOCK_DATA) {
         toast.success("Bet placed!", {
           description: `You bet $${quickBetAmount} on ${market.outcomes.find(o => o.id === outcomeId)?.title}`,
+          position: "top-center"
         });
         return;
       }
 
       try {
         // Get quote first
-        toast.loading("Getting quote...", { id: "quick-bet" });
+        toast.loading("Getting quote...", { id: "quick-bet", position: "top-center" });
         
         const { quote, amount } = await quoteMutation.mutateAsync({ market, outcomeId, amount: quickBetAmount });
 
-        toast.loading("Confirm in wallet...", { id: "quick-bet" });
+        toast.loading("Confirm in wallet...", { id: "quick-bet", position: "top-center" });
 
         // Execute trade
         await trade({
@@ -110,6 +114,7 @@ export default function SwipeMarketsPage() {
         toast.dismiss("quick-bet");
         toast.error("Bet failed", {
           description: error instanceof Error ? error.message : "Please try again",
+          position: "top-center"
         });
       }
     },
@@ -127,7 +132,8 @@ export default function SwipeMarketsPage() {
   });
 
   // Show auth gate if not connected (skip in mock mode)
-  if (!isConnected && !USE_MOCK_DATA) {
+  // Always require wallet connection
+  if (!isConnected) {
     return <AuthGate />;
   }
 

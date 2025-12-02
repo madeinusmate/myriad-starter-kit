@@ -60,7 +60,9 @@ export function ConnectWalletButton({
   const handleCopyAddress = () => {
     if (address) {
       navigator.clipboard.writeText(address);
-      toast.success("Address copied to clipboard");
+      toast.success("Address copied to clipboard", {
+        position: "top-center"
+      });
       setHasCopied(true);
       setTimeout(() => setHasCopied(false), 2000);
     }

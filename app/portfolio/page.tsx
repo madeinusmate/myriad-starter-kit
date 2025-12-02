@@ -39,7 +39,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthGate } from "@/components/swipe";
-import { USE_MOCK_DATA } from "@/lib/config";
 import type { Position, MarketEvent } from "@/lib/types";
 import { format } from "date-fns";
 import { AuroraBackground } from "@/components/ui/aurora-background";
@@ -430,24 +429,22 @@ export default function PortfolioPage() {
   // Fetch profile
   const { data: profile } = useQuery(abstractProfileQueryOptions(address));
 
-  // Fetch portfolio
-  const { data: portfolioData, isPending: isPortfolioPending } = useQuery({
-    ...portfolioQueryOptions(apiBaseUrl, address ?? "", {
+  // Fetch portfolio (enabled handled by query options, mock data uses static data)
+  const { data: portfolioData, isPending: isPortfolioPending } = useQuery(
+    portfolioQueryOptions(apiBaseUrl, address ?? "", {
       networkId: networkConfig.id,
-    }),
-    enabled: Boolean(address) || USE_MOCK_DATA,
-  });
+    })
+  );
 
-  // Fetch activity
-  const { data: activityData, isPending: isActivityPending } = useInfiniteQuery({
-    ...userEventsInfiniteQueryOptions(apiBaseUrl, address ?? "", {
+  // Fetch activity (enabled handled by query options, mock data uses static data)
+  const { data: activityData, isPending: isActivityPending } = useInfiniteQuery(
+    userEventsInfiniteQueryOptions(apiBaseUrl, address ?? "", {
       networkId: networkConfig.id,
-    }),
-    enabled: Boolean(address) || USE_MOCK_DATA,
-  });
+    })
+  );
 
-  // Show auth gate if not connected and not using mock data
-  if (!isConnected && !USE_MOCK_DATA) {
+  // Always require wallet connection
+  if (!isConnected) {
     return <AuthGate />;
   }
 

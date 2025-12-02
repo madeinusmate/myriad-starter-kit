@@ -8,7 +8,7 @@
  */
 
 import { useLoginWithAbstract } from "@abstract-foundation/agw-react";
-import { Wallet, Loader2, TrendingUp, Zap, Shield, LogIn } from "lucide-react";
+import { Wallet, Loader2, TrendingUp, Zap, Shield, LogIn, GalleryVerticalEndIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "wagmi";
 
@@ -36,14 +36,14 @@ export const AuthGate = () => {
         {/* Logo */}
         <div className="mb-8 relative">
           <div className="h-20 w-20 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
-            <span className="text-3xl font-black text-white">M</span>
+            <GalleryVerticalEndIcon className="h-10 w-10 text-white" />
           </div>
           <div className="absolute -inset-4 bg-white/5 rounded-3xl blur-xl -z-10" />
         </div>
 
         {/* Title */}
         <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-          Prediction Markets
+          SwipeStakes
         </h1>
         <p className="text-lg text-white/60 mb-8">
           Swipe through markets. Bet on outcomes. Win big.
@@ -75,12 +75,12 @@ export const AuthGate = () => {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Connecting...
+              Signing in...
             </>
           ) : (
             <>
               <LogIn className="mr-2 h-5 w-5" />
-              Login
+              Sign in
             </>
           )}
         </Button>
